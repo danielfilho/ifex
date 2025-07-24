@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset_name: ifex-linux-x86_64
+          - os: macos-latest
+            target: x86_64-apple-darwin  
+            asset_name: ifex-macos-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            asset_name: ifex-macos-aarch64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset_name: ifex-windows-x86_64.exe
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          
+      - uses: Swatinem/rust-cache@v2
+      
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+        
+      - name: Prepare release asset (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cp target/${{ matrix.target }}/release/ifex ${{ matrix.asset_name }}
+          chmod +x ${{ matrix.asset_name }}
+          
+      - name: Prepare release asset (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cp target/${{ matrix.target }}/release/ifex.exe ${{ matrix.asset_name }}
+          
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset_name }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
