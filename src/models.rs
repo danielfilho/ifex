@@ -21,8 +21,9 @@ pub struct Camera {
 
 impl Camera {
   /// Creates a new camera with the specified maker and model.
-  /// 
+  ///
   /// Automatically generates a unique ID and sets the creation timestamp.
+  #[must_use]
   pub fn new(maker: String, model: String) -> Self {
     Self {
       id: Uuid::new_v4(),
@@ -33,8 +34,9 @@ impl Camera {
   }
 
   /// Returns a human-readable display name for the camera.
-  /// 
+  ///
   /// Format: "Maker Model" (e.g., "Canon EOS R5")
+  #[must_use]
   pub fn display_name(&self) -> String {
     format!("{} {}", self.maker, self.model)
   }
@@ -63,8 +65,9 @@ pub struct Lens {
 
 impl Lens {
   /// Creates a new lens with the specified parameters.
-  /// 
+  ///
   /// Automatically generates a unique ID and sets the creation timestamp.
+  #[must_use]
   pub fn new(
     maker: String,
     model: String,
@@ -84,8 +87,9 @@ impl Lens {
   }
 
   /// Returns a human-readable display name for the lens.
-  /// 
+  ///
   /// Format: "Maker Model Focalmm f/Aperture" (e.g., "Canon EF 50mm f/1.4")
+  #[must_use]
   pub fn display_name(&self) -> String {
     format!(
       "{} {} {}mm f/{}",
@@ -94,15 +98,17 @@ impl Lens {
   }
 
   /// Returns the lens model name combined with its aperture specification.
-  /// 
+  ///
   /// Format: "Model f/Aperture" (e.g., "EF 50mm f/1.4")
+  #[must_use]
   pub fn lens_model_with_aperture(&self) -> String {
     format!("{} f/{}", self.model, self.aperture)
   }
 
   /// Returns the complete lens model for EXIF including focal length.
-  /// 
-  /// Format: "Model FocalLength f/Aperture" (e.g., "Summicron 35mm f/2")
+  ///
+  /// Format: "Model `FocalLength` f/Aperture" (e.g., "Summicron 35mm f/2")
+  #[must_use]
   pub fn complete_lens_model(&self) -> String {
     format!("{} {}mm f/{}", self.model, self.focal_length, self.aperture)
   }
@@ -126,8 +132,9 @@ pub struct Film {
 
 impl Film {
   /// Creates a new film stock with the specified parameters.
-  /// 
+  ///
   /// Automatically generates a unique ID and sets the creation timestamp.
+  #[must_use]
   pub fn new(maker: String, name: String, iso: u32) -> Self {
     Self {
       id: Uuid::new_v4(),
@@ -139,8 +146,9 @@ impl Film {
   }
 
   /// Returns a human-readable display name for the film.
-  /// 
+  ///
   /// Format: "Maker Name (ISO rating)" (e.g., "Kodak Tri-X (ISO 400)")
+  #[must_use]
   pub fn display_name(&self) -> String {
     format!("{} {} (ISO {})", self.maker, self.name, self.iso)
   }
@@ -162,8 +170,9 @@ pub struct Photographer {
 
 impl Photographer {
   /// Creates a new photographer with the specified name and optional email.
-  /// 
+  ///
   /// Automatically generates a unique ID and sets the creation timestamp.
+  #[must_use]
   pub fn new(name: String, email: Option<String>) -> Self {
     Self {
       id: Uuid::new_v4(),
@@ -174,14 +183,15 @@ impl Photographer {
   }
 
   /// Returns a human-readable display name for the photographer.
-  /// 
+  ///
   /// If email is provided, format: "Name <email>"
   /// Otherwise, format: "Name"
+  #[must_use]
   pub fn display_name(&self) -> String {
-    match &self.email {
-      Some(email) => format!("{} <{}>", self.name, email),
-      None => self.name.clone(),
-    }
+    self.email.as_ref().map_or_else(
+      || self.name.clone(),
+      |email| format!("{} <{}>", self.name, email),
+    )
   }
 }
 
@@ -205,8 +215,9 @@ pub struct Setup {
 
 impl Setup {
   /// Creates a new equipment setup with the specified name and equipment IDs.
-  /// 
+  ///
   /// Automatically generates a unique ID and sets the creation timestamp.
+  #[must_use]
   pub fn new(name: String, camera_id: Uuid, lens_id: Uuid) -> Self {
     Self {
       id: Uuid::new_v4(),
@@ -218,15 +229,16 @@ impl Setup {
   }
 
   /// Returns the display name for the setup.
-  /// 
+  ///
   /// Currently just returns the user-defined name.
+  #[must_use]
   pub fn display_name(&self) -> String {
     self.name.clone()
   }
 }
 
 /// Complete equipment selection for EXIF metadata application.
-/// 
+///
 /// This struct combines all the necessary equipment and photographer information
 /// needed to apply comprehensive EXIF metadata to images. It includes the setup
 /// (camera + lens combination), film stock, and photographer details.

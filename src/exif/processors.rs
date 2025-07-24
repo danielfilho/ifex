@@ -1,5 +1,5 @@
 //! EXIF metadata processors for different image file formats.
-//! 
+//!
 //! This module contains specialized processors for handling EXIF metadata
 //! operations on different image file types. Each processor implements
 //! format-specific logic for applying, erasing, and reading EXIF data.
@@ -12,26 +12,26 @@ use std::io::BufReader;
 use std::path::Path;
 
 /// JPEG file EXIF processor.
-/// 
+///
 /// Handles EXIF metadata operations for JPEG files by manipulating
 /// the EXIF segments directly in the JPEG file structure.
 pub struct JpegProcessor;
 
 /// TIFF file EXIF processor.
-/// 
+///
 /// Handles EXIF metadata operations for TIFF files using the image crate
 /// for file manipulation and the exif crate for metadata reading.
 pub struct TiffProcessor;
 
 /// RAW file EXIF processor.
-/// 
+///
 /// Handles EXIF metadata operations for RAW camera files by creating
 /// and managing XMP sidecar files alongside the original raw files.
 pub struct RawProcessor;
 
 impl JpegProcessor {
   /// Applies EXIF metadata to a JPEG file.
-  /// 
+  ///
   /// Creates new EXIF segments containing equipment and photographer information
   /// from the selection and embeds them into the JPEG file structure.
   /// This method preserves existing EXIF/IPTC data and only updates the specified fields.
@@ -59,7 +59,7 @@ impl JpegProcessor {
           let marker = original_data[i + 1];
           if marker == 0xe1 {
             let segment_length =
-              ((original_data[i + 2] as u16) << 8) | (original_data[i + 3] as u16);
+              (u16::from(original_data[i + 2]) << 8) | u16::from(original_data[i + 3]);
             i += 2 + segment_length as usize;
             continue;
           }
@@ -79,7 +79,7 @@ impl JpegProcessor {
   }
 
   /// Erases EXIF metadata from a JPEG file.
-  /// 
+  ///
   /// Removes all EXIF and JFIF segments from the JPEG file,
   /// leaving only the core image data.
   pub fn erase_exif(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -97,7 +97,8 @@ impl JpegProcessor {
       if original_data[i] == 0xff {
         let marker = original_data[i + 1];
         if marker == 0xe1 || marker == 0xe0 {
-          let segment_length = ((original_data[i + 2] as u16) << 8) | (original_data[i + 3] as u16);
+          let segment_length =
+            (u16::from(original_data[i + 2]) << 8) | u16::from(original_data[i + 3]);
           i += 2 + segment_length as usize;
           continue;
         }
@@ -127,29 +128,29 @@ impl JpegProcessor {
     for field in exif.fields() {
       let tag_name = Self::format_tag_name(&field.tag);
       let mut value = Self::format_exif_value(&field.value);
-      
+
       // Truncate long values
       if value.len() > 50 {
         value.truncate(50);
         value.push('…');
       }
-      
+
       // Add IFD context to help identify the source
       let ifd_name = match field.ifd_num {
         exif::In::PRIMARY => "",
         exif::In::THUMBNAIL => " (Thumbnail)",
-        _ => " (Sub-IFD)", 
+        _ => " (Sub-IFD)",
       };
       let full_tag_name = if ifd_name.is_empty() {
         tag_name.clone()
       } else {
-        format!("{}{}", tag_name, ifd_name)
+        format!("{tag_name}{ifd_name}")
       };
-      
+
       // Also add raw tag info for debugging unknown tags
       let raw_tag_info = format!("{:?}", field.tag);
       if raw_tag_info.contains("Tag(") && !raw_tag_info.starts_with(&tag_name) {
-        results.push((format!("{} [{}]", full_tag_name, raw_tag_info), value.clone()));
+        results.push((format!("{full_tag_name} [{raw_tag_info}]"), value.clone()));
       } else {
         results.push((full_tag_name, value));
       }
@@ -163,9 +164,8 @@ impl JpegProcessor {
     Ok(results)
   }
 
-
   /// Reads IPTC data from APP13 segments in JPEG files.
-  /// 
+  ///
   /// Searches for APP13 (0xFFED) segments that contain IPTC metadata
   /// and extracts common IPTC fields like keywords, caption, etc.
   fn read_iptc_data(path: &Path) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
@@ -178,9 +178,9 @@ impl JpegProcessor {
       if data[i] == 0xFF && data[i + 1] == 0xED {
         // Found APP13 segment
         if i + 4 < data.len() {
-          let segment_len = ((data[i + 2] as u16) << 8) | (data[i + 3] as u16);
+          let segment_len = (u16::from(data[i + 2]) << 8) | u16::from(data[i + 3]);
           let segment_end = i + 2 + segment_len as usize;
-          
+
           if segment_end <= data.len() {
             // Look for Photoshop resource blocks within APP13
             let segment_data = &data[i + 4..segment_end];
@@ -202,18 +202,18 @@ impl JpegProcessor {
   /// Parses IPTC records from Photoshop resource data.
   fn parse_iptc_records(data: &[u8], results: &mut Vec<(String, String)>) {
     let mut i = 0;
-    
+
     while i + 8 < data.len() {
       // Look for IPTC record marker (0x1C)
       if data[i] == 0x1C {
         let record = data[i + 1];
         let dataset = data[i + 2];
-        let length = ((data[i + 3] as u16) << 8) | (data[i + 4] as u16);
-        
+        let length = (u16::from(data[i + 3]) << 8) | u16::from(data[i + 4]);
+
         if i + 5 + length as usize <= data.len() {
           let value_data = &data[i + 5..i + 5 + length as usize];
           let value = String::from_utf8_lossy(value_data).trim().to_string();
-          
+
           if !value.is_empty() {
             let tag_name = Self::format_iptc_tag(record, dataset);
             let mut display_value = value;
@@ -222,9 +222,9 @@ impl JpegProcessor {
               display_value.truncate(50);
               display_value.push('…');
             }
-            results.push((format!("IPTC: {}", tag_name), display_value));
+            results.push((format!("IPTC: {tag_name}"), display_value));
           }
-          
+
           i += 5 + length as usize;
         } else {
           break;
@@ -262,17 +262,18 @@ impl JpegProcessor {
       (2, 118) => "Contact".to_string(),
       (2, 120) => "Caption/Abstract".to_string(),
       (2, 122) => "Caption Writer/Editor".to_string(),
-      _ => format!("Record {} Dataset {}", record, dataset),
+      _ => format!("Record {record} Dataset {dataset}"),
     }
   }
 
   /// Formats an EXIF tag into a human-readable name.
-  /// 
+  ///
   /// Maps known EXIF tags to descriptive names, and provides fallback
   /// formatting for unknown tags using their numeric identifiers.
+  #[must_use]
   pub fn format_tag_name(tag: &exif::Tag) -> String {
     use exif::Tag;
-    
+
     match *tag {
       Tag::Make => "Make".to_string(),
       Tag::Model => "Model".to_string(),
@@ -338,7 +339,7 @@ impl JpegProcessor {
       Tag::LensSerialNumber => "Lens Serial Number".to_string(),
       _ => {
         // For unknown tags, try to provide a cleaner format
-        let tag_str = format!("{}", tag);
+        let tag_str = format!("{tag}");
         if tag_str.starts_with("Tag(") && tag_str.ends_with(')') {
           // Extract the numeric tag ID from "Tag(Context, 12345)" format
           if let Some(comma_pos) = tag_str.rfind(", ") {
@@ -386,7 +387,7 @@ impl JpegProcessor {
                 "41993" => return "Saturation".to_string(),
                 "41994" => return "Sharpness".to_string(),
                 "42016" => return "Image Unique ID".to_string(),
-                _ => return format!("Tag {}", tag_num),
+                _ => return format!("Tag {tag_num}"),
               }
             }
           }
@@ -397,12 +398,13 @@ impl JpegProcessor {
   }
 
   /// Formats an EXIF value into a human-readable string.
-  /// 
+  ///
   /// Handles different EXIF value types and converts them to displayable
   /// strings, with special handling for binary data and ASCII strings.
+  #[must_use]
   pub fn format_exif_value(value: &Value) -> String {
     match value {
-      Value::Byte(bytes) => format!("{:?}", bytes),
+      Value::Byte(bytes) => format!("{bytes:?}"),
       Value::Ascii(ascii) => {
         let result = ascii
           .iter()
@@ -419,22 +421,26 @@ impl JpegProcessor {
           .filter(|s| !s.is_empty())
           .collect::<Vec<_>>()
           .join(", ");
-        
+
         // If result is empty or contains only non-printable data, show a placeholder
-        if result.is_empty() || result.chars().all(|c| !c.is_ascii_graphic() && !c.is_ascii_whitespace()) {
+        if result.is_empty()
+          || result
+            .chars()
+            .all(|c| !c.is_ascii_graphic() && !c.is_ascii_whitespace())
+        {
           "<binary data>".to_string()
         } else {
           result
         }
-      },
+      }
       Value::Short(shorts) => shorts
         .iter()
-        .map(|s| s.to_string())
+        .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join(", "),
       Value::Long(longs) => longs
         .iter()
-        .map(|l| l.to_string())
+        .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join(", "),
       Value::Rational(rationals) => rationals
@@ -442,16 +448,16 @@ impl JpegProcessor {
         .map(|r| format!("{}/{}", r.num, r.denom))
         .collect::<Vec<_>>()
         .join(", "),
-      Value::SByte(bytes) => format!("{:?}", bytes),
+      Value::SByte(bytes) => format!("{bytes:?}"),
       Value::Undefined(bytes, _) => format!("Undefined({} bytes)", bytes.len()),
       Value::SShort(shorts) => shorts
         .iter()
-        .map(|s| s.to_string())
+        .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join(", "),
       Value::SLong(longs) => longs
         .iter()
-        .map(|l| l.to_string())
+        .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join(", "),
       Value::SRational(rationals) => rationals
@@ -461,26 +467,30 @@ impl JpegProcessor {
         .join(", "),
       Value::Float(floats) => floats
         .iter()
-        .map(|f| f.to_string())
+        .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join(", "),
       Value::Double(doubles) => doubles
         .iter()
-        .map(|d| d.to_string())
+        .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join(", "),
       Value::Unknown(tag, ty, count) => {
-        format!("Unknown(tag={}, type={}, count={})", tag, ty, count)
+        format!("Unknown(tag={tag}, type={ty}, count={count})")
       }
     }
   }
 
   /// Applies EXIF metadata to a JPEG file with optional custom shot ISO.
-  /// 
-  /// Similar to apply_exif but allows overriding the ISO value for push/pull processing.
-  /// If shot_iso is None, uses the film's base ISO rating.
+  ///
+  /// Similar to `apply_exif` but allows overriding the ISO value for push/pull processing.
+  /// If `shot_iso` is None, uses the film's base ISO rating.
   /// This method preserves existing EXIF/IPTC data and only updates the specified fields.
-  pub fn apply_exif_with_iso(path: &Path, selection: &Selection, shot_iso: Option<u32>) -> Result<(), Box<dyn std::error::Error>> {
+  pub fn apply_exif_with_iso(
+    path: &Path,
+    selection: &Selection,
+    shot_iso: Option<u32>,
+  ) -> Result<(), Box<dyn std::error::Error>> {
     let file = fs::File::open(path)?;
     let mut bufreader = BufReader::new(&file);
 
@@ -495,7 +505,8 @@ impl JpegProcessor {
       new_data.extend_from_slice(&original_data[0..2]);
 
       // Create merged EXIF segment that preserves existing data
-      let exif_data = Self::create_merged_exif_segment_with_iso(selection, shot_iso, existing_exif.as_ref())?;
+      let exif_data =
+        Self::create_merged_exif_segment_with_iso(selection, shot_iso, existing_exif.as_ref())?;
       new_data.extend_from_slice(&exif_data);
 
       let mut i = 2;
@@ -504,7 +515,7 @@ impl JpegProcessor {
           let marker = original_data[i + 1];
           if marker == 0xe1 {
             let segment_length =
-              ((original_data[i + 2] as u16) << 8) | (original_data[i + 3] as u16);
+              (u16::from(original_data[i + 2]) << 8) | u16::from(original_data[i + 3]);
             i += 2 + segment_length as usize;
             continue;
           }
@@ -521,18 +532,24 @@ impl JpegProcessor {
     Ok(())
   }
 
-
   /// Creates an EXIF segment while preserving existing EXIF data.
-  fn create_merged_exif_segment(selection: &Selection, existing_exif: Option<&exif::Exif>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+  fn create_merged_exif_segment(
+    selection: &Selection,
+    existing_exif: Option<&exif::Exif>,
+  ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     Self::create_merged_exif_segment_with_iso(selection, None, existing_exif)
   }
 
   /// Creates an EXIF segment with optional custom shot ISO while preserving existing EXIF data.
   /// Note: This is a simplified implementation that preserves only ASCII string fields.
   /// More complex EXIF fields are not currently preserved to avoid data corruption.
-  fn create_merged_exif_segment_with_iso(selection: &Selection, shot_iso: Option<u32>, existing_exif: Option<&exif::Exif>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+  fn create_merged_exif_segment_with_iso(
+    selection: &Selection,
+    shot_iso: Option<u32>,
+    existing_exif: Option<&exif::Exif>,
+  ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     use exif::Value;
-    
+
     let mut segment = Vec::new();
     segment.extend_from_slice(b"\xff\xe1");
 
@@ -546,7 +563,7 @@ impl JpegProcessor {
     // Define the tags we want to update/override - using numeric IDs for more reliable matching
     let our_tag_numbers = [
       0x010f, // Make
-      0x0110, // Model  
+      0x0110, // Model
       0x013b, // Artist
       0xa433, // LensMake
       0xa434, // LensModel
@@ -561,8 +578,8 @@ impl JpegProcessor {
     if let Some(exif) = existing_exif {
       for field in exif.fields() {
         // Get the numeric tag ID for comparison
-        let tag_number = Self::tag_to_number(&field.tag);
-        
+        let tag_number = Self::tag_to_number(field.tag);
+
         // Only skip the specific fields we're overriding, preserve everything else
         if let Some(tag_num) = tag_number {
           if our_tag_numbers.contains(&tag_num) {
@@ -577,7 +594,7 @@ impl JpegProcessor {
               if let Ok(string_value) = std::str::from_utf8(ascii_bytes) {
                 let clean_value = string_value.trim_end_matches('\0');
                 if !clean_value.is_empty() && clean_value.len() < 1000 {
-                  if let Some(tag_number) = Self::tag_to_number(&field.tag) {
+                  if let Some(tag_number) = Self::tag_to_number(field.tag) {
                     preserved_fields.push((tag_number, 0x02, clean_value.as_bytes().to_vec()));
                   }
                 }
@@ -585,7 +602,7 @@ impl JpegProcessor {
             }
           }
           Value::Short(shorts) => {
-            if let Some(tag_number) = Self::tag_to_number(&field.tag) {
+            if let Some(tag_number) = Self::tag_to_number(field.tag) {
               let mut data_bytes = Vec::new();
               for &short_val in shorts {
                 data_bytes.extend_from_slice(&short_val.to_le_bytes());
@@ -594,7 +611,7 @@ impl JpegProcessor {
             }
           }
           Value::Long(longs) => {
-            if let Some(tag_number) = Self::tag_to_number(&field.tag) {
+            if let Some(tag_number) = Self::tag_to_number(field.tag) {
               let mut data_bytes = Vec::new();
               for &long_val in longs {
                 data_bytes.extend_from_slice(&long_val.to_le_bytes());
@@ -603,7 +620,7 @@ impl JpegProcessor {
             }
           }
           Value::Rational(rationals) => {
-            if let Some(tag_number) = Self::tag_to_number(&field.tag) {
+            if let Some(tag_number) = Self::tag_to_number(field.tag) {
               let mut data_bytes = Vec::new();
               for rational in rationals {
                 data_bytes.extend_from_slice(&rational.num.to_le_bytes());
@@ -613,7 +630,7 @@ impl JpegProcessor {
             }
           }
           Value::SRational(srationals) => {
-            if let Some(tag_number) = Self::tag_to_number(&field.tag) {
+            if let Some(tag_number) = Self::tag_to_number(field.tag) {
               let mut data_bytes = Vec::new();
               for srational in srationals {
                 data_bytes.extend_from_slice(&srational.num.to_le_bytes());
@@ -623,23 +640,23 @@ impl JpegProcessor {
             }
           }
           Value::Byte(bytes) => {
-            if let Some(tag_number) = Self::tag_to_number(&field.tag) {
+            if let Some(tag_number) = Self::tag_to_number(field.tag) {
               preserved_fields.push((tag_number, 0x01, bytes.clone()));
             }
           }
           Value::Undefined(bytes, _) => {
-            if let Some(tag_number) = Self::tag_to_number(&field.tag) {
+            if let Some(tag_number) = Self::tag_to_number(field.tag) {
               preserved_fields.push((tag_number, 0x07, bytes.clone()));
             }
           }
           Value::SByte(sbytes) => {
-            if let Some(tag_number) = Self::tag_to_number(&field.tag) {
+            if let Some(tag_number) = Self::tag_to_number(field.tag) {
               let bytes: Vec<u8> = sbytes.iter().map(|&b| b as u8).collect();
               preserved_fields.push((tag_number, 0x06, bytes));
             }
           }
           Value::SShort(sshorts) => {
-            if let Some(tag_number) = Self::tag_to_number(&field.tag) {
+            if let Some(tag_number) = Self::tag_to_number(field.tag) {
               let mut data_bytes = Vec::new();
               for &sshort_val in sshorts {
                 data_bytes.extend_from_slice(&sshort_val.to_le_bytes());
@@ -648,7 +665,7 @@ impl JpegProcessor {
             }
           }
           Value::SLong(slongs) => {
-            if let Some(tag_number) = Self::tag_to_number(&field.tag) {
+            if let Some(tag_number) = Self::tag_to_number(field.tag) {
               let mut data_bytes = Vec::new();
               for &slong_val in slongs {
                 data_bytes.extend_from_slice(&slong_val.to_le_bytes());
@@ -657,7 +674,7 @@ impl JpegProcessor {
             }
           }
           Value::Float(floats) => {
-            if let Some(tag_number) = Self::tag_to_number(&field.tag) {
+            if let Some(tag_number) = Self::tag_to_number(field.tag) {
               let mut data_bytes = Vec::new();
               for &float_val in floats {
                 data_bytes.extend_from_slice(&float_val.to_le_bytes());
@@ -666,7 +683,7 @@ impl JpegProcessor {
             }
           }
           Value::Double(doubles) => {
-            if let Some(tag_number) = Self::tag_to_number(&field.tag) {
+            if let Some(tag_number) = Self::tag_to_number(field.tag) {
               let mut data_bytes = Vec::new();
               for &double_val in doubles {
                 data_bytes.extend_from_slice(&double_val.to_le_bytes());
@@ -686,21 +703,22 @@ impl JpegProcessor {
     let mut all_string_fields = Vec::new();
 
     // Add our fields (these override existing ones)
-    all_string_fields.push((0x010f, selection.camera.maker.as_str()));    // Make
-    all_string_fields.push((0x0110, selection.camera.model.as_str()));    // Model
+    all_string_fields.push((0x010f, selection.camera.maker.as_str())); // Make
+    all_string_fields.push((0x0110, selection.camera.model.as_str())); // Model
     all_string_fields.push((0x013b, selection.photographer.name.as_str())); // Artist
-    all_string_fields.push((0xa433, selection.lens.maker.as_str()));      // Lens Make
+    all_string_fields.push((0xa433, selection.lens.maker.as_str())); // Lens Make
     let lens_model_complete = selection.lens.complete_lens_model();
-    all_string_fields.push((0xa434, lens_model_complete.as_str()));       // Lens Model
+    all_string_fields.push((0xa434, lens_model_complete.as_str())); // Lens Model
 
     // Add ISO field
     let iso_value = shot_iso.unwrap_or(selection.film.iso);
-    
+
     // Add focal length if parseable
     let focal_length_entry = selection.lens.focal_length.parse::<f32>().is_ok();
-    
+
     // Calculate entry count
-    let entry_count = all_string_fields.len() + preserved_fields.len() + 1 + if focal_length_entry { 1 } else { 0 };
+    let entry_count =
+      all_string_fields.len() + preserved_fields.len() + 1 + usize::from(focal_length_entry);
     data.extend_from_slice(&(entry_count as u16).to_le_bytes());
 
     // Calculate where string data will start
@@ -714,7 +732,7 @@ impl JpegProcessor {
       entry.extend_from_slice(&(*tag as u16).to_le_bytes());
       entry.extend_from_slice(&[0x02, 0x00]); // ASCII type
       let string_len = value.len() + 1; // Include null terminator
-      entry.extend_from_slice(&(string_len as u32).to_le_bytes());
+      entry.extend_from_slice(&u32::try_from(string_len).unwrap_or(0).to_le_bytes());
 
       if string_len <= 4 {
         // String fits in offset field
@@ -726,7 +744,7 @@ impl JpegProcessor {
         entry.extend_from_slice(&padded_value[0..4]);
       } else {
         // String needs offset
-        entry.extend_from_slice(&(string_offset as u32).to_le_bytes());
+        entry.extend_from_slice(&u32::try_from(string_offset).unwrap_or(0).to_le_bytes());
         string_data.extend_from_slice(value.as_bytes());
         string_data.push(0); // null terminator
         string_offset += string_len;
@@ -740,15 +758,14 @@ impl JpegProcessor {
       let mut entry = Vec::new();
       entry.extend_from_slice(&tag_num.to_le_bytes());
       entry.extend_from_slice(&[field_type, 0x00]);
-      
+
       let count = match field_type {
-        0x01 | 0x02 | 0x06 | 0x07 => field_data.len(), // BYTE, ASCII, SBYTE, UNDEFINED
-        0x03 | 0x08 => field_data.len() / 2, // SHORT, SSHORT
+        0x03 | 0x08 => field_data.len() / 2,        // SHORT, SSHORT
         0x04 | 0x09 | 0x0B => field_data.len() / 4, // LONG, SLONG, FLOAT
         0x05 | 0x0A | 0x0C => field_data.len() / 8, // RATIONAL, SRATIONAL, DOUBLE
         _ => field_data.len(),
       };
-      entry.extend_from_slice(&(count as u32).to_le_bytes());
+      entry.extend_from_slice(&u32::try_from(count).unwrap_or(0).to_le_bytes());
 
       if field_data.len() <= 4 {
         // Data fits in offset field
@@ -759,7 +776,7 @@ impl JpegProcessor {
         entry.extend_from_slice(&padded_data[0..4]);
       } else {
         // Data needs offset
-        entry.extend_from_slice(&(string_offset as u32).to_le_bytes());
+        entry.extend_from_slice(&u32::try_from(string_offset).unwrap_or(0).to_le_bytes());
         string_data.extend_from_slice(&field_data);
         string_offset += field_data.len();
       }
@@ -772,20 +789,20 @@ impl JpegProcessor {
     iso_entry.extend_from_slice(&(0x8827u16).to_le_bytes()); // ISO tag
     iso_entry.extend_from_slice(&[0x03, 0x00]); // SHORT type
     iso_entry.extend_from_slice(&1u32.to_le_bytes()); // count = 1
-    iso_entry.extend_from_slice(&(iso_value as u16).to_le_bytes()); // ISO value
+    iso_entry.extend_from_slice(&u16::try_from(iso_value).unwrap_or(0).to_le_bytes()); // ISO value
     iso_entry.extend_from_slice(&[0x00, 0x00]); // padding
     data.extend_from_slice(&iso_entry);
 
     // Add focal length if parseable
     if let Ok(focal_length) = selection.lens.focal_length.parse::<f32>() {
-      let focal_length_rational = (focal_length * 1000.0) as u32;
+      let focal_length_rational = (focal_length * 1000.0).abs() as u32;
       let mut focal_entry = Vec::new();
       focal_entry.extend_from_slice(&(0x920Au16).to_le_bytes()); // Focal length tag
       focal_entry.extend_from_slice(&[0x05, 0x00]); // RATIONAL type
       focal_entry.extend_from_slice(&1u32.to_le_bytes()); // count = 1
-      focal_entry.extend_from_slice(&(string_offset as u32).to_le_bytes()); // offset to rational data
+      focal_entry.extend_from_slice(&u32::try_from(string_offset).unwrap_or(0).to_le_bytes()); // offset to rational data
       data.extend_from_slice(&focal_entry);
-      
+
       // Add rational data at the end (numerator/denominator)
       string_data.extend_from_slice(&focal_length_rational.to_le_bytes());
       string_data.extend_from_slice(&1000u32.to_le_bytes());
@@ -798,7 +815,7 @@ impl JpegProcessor {
     data.extend_from_slice(&string_data);
 
     // Add length and data to segment
-    let length = (data.len() + 2) as u16;
+    let length = u16::try_from(data.len() + 2).unwrap_or(0);
     segment.push((length >> 8) as u8);
     segment.push((length & 0xff) as u8);
     segment.extend_from_slice(&data);
@@ -808,10 +825,10 @@ impl JpegProcessor {
 
   /// Convert an EXIF tag to its numeric representation for field processing.
   /// This is a helper function for the merged EXIF segment creation.
-  fn tag_to_number(tag: &exif::Tag) -> Option<u16> {
+  fn tag_to_number(tag: exif::Tag) -> Option<u16> {
     use exif::Tag;
-    
-    match *tag {
+
+    match tag {
       Tag::ImageWidth => Some(0x0100),
       Tag::ImageLength => Some(0x0101),
       Tag::Compression => Some(0x0103),
@@ -883,7 +900,7 @@ impl JpegProcessor {
       // These will be handled by the fallback case, but we can add known ones here
       _ => {
         // For truly unknown tags, try to extract the numeric value from the debug format
-        let tag_str = format!("{:?}", tag);
+        let tag_str = format!("{tag:?}");
         if tag_str.contains("Tag(") {
           if let Some(comma_pos) = tag_str.rfind(", ") {
             if let Some(end_pos) = tag_str.rfind(')') {
@@ -902,7 +919,7 @@ impl JpegProcessor {
 
 impl TiffProcessor {
   /// Applies EXIF metadata to a TIFF file.
-  /// 
+  ///
   /// Currently re-saves the TIFF file using the image crate.
   /// Full EXIF application for TIFF files is not yet implemented.
   pub fn apply_exif(path: &Path, _selection: &Selection) -> Result<(), Box<dyn std::error::Error>> {
@@ -925,7 +942,7 @@ impl TiffProcessor {
   }
 
   /// Erases EXIF metadata from a TIFF file.
-  /// 
+  ///
   /// Re-saves the TIFF file which removes embedded metadata.
   pub fn erase_exif(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let img = image::open(path)?;
@@ -935,7 +952,7 @@ impl TiffProcessor {
   }
 
   /// Reads EXIF metadata from a TIFF file.
-  /// 
+  ///
   /// Extracts all available EXIF fields and returns them as key-value pairs,
   /// sorted alphabetically by tag name.
   /// Read EXIF data from a TIFF file and return as key-value pairs
@@ -952,29 +969,29 @@ impl TiffProcessor {
     for field in exif.fields() {
       let tag_name = JpegProcessor::format_tag_name(&field.tag);
       let mut value = JpegProcessor::format_exif_value(&field.value);
-      
+
       // Truncate long values
       if value.len() > 50 {
         value.truncate(50);
         value.push('…');
       }
-      
+
       // Add IFD context to help identify the source
       let ifd_name = match field.ifd_num {
         exif::In::PRIMARY => "",
         exif::In::THUMBNAIL => " (Thumbnail)",
-        _ => " (Sub-IFD)", 
+        _ => " (Sub-IFD)",
       };
       let full_tag_name = if ifd_name.is_empty() {
         tag_name.clone()
       } else {
-        format!("{}{}", tag_name, ifd_name)
+        format!("{tag_name}{ifd_name}")
       };
-      
+
       // Also add raw tag info for debugging unknown tags
       let raw_tag_info = format!("{:?}", field.tag);
       if raw_tag_info.contains("Tag(") && !raw_tag_info.starts_with(&tag_name) {
-        results.push((format!("{} [{}]", full_tag_name, raw_tag_info), value.clone()));
+        results.push((format!("{full_tag_name} [{raw_tag_info}]"), value.clone()));
       } else {
         results.push((full_tag_name, value));
       }
@@ -985,12 +1002,16 @@ impl TiffProcessor {
   }
 
   /// Applies EXIF metadata to a TIFF file with optional custom shot ISO.
-  /// 
-  /// Similar to apply_exif but allows overriding the ISO value for push/pull processing.
-  /// If shot_iso is None, uses the film's base ISO rating.
+  ///
+  /// Similar to `apply_exif` but allows overriding the ISO value for push/pull processing.
+  /// If `shot_iso` is None, uses the film's base ISO rating.
   /// Currently re-saves the TIFF file using the image crate.
   /// Full EXIF application for TIFF files is not yet implemented.
-  pub fn apply_exif_with_iso(path: &Path, _selection: &Selection, _shot_iso: Option<u32>) -> Result<(), Box<dyn std::error::Error>> {
+  pub fn apply_exif_with_iso(
+    path: &Path,
+    _selection: &Selection,
+    _shot_iso: Option<u32>,
+  ) -> Result<(), Box<dyn std::error::Error>> {
     let img = image::open(path)?;
     let mut output_file = fs::File::create(path)?;
     img.write_to(&mut output_file, image::ImageFormat::Tiff)?;
@@ -1000,7 +1021,7 @@ impl TiffProcessor {
 
 impl RawProcessor {
   /// Applies EXIF metadata to a RAW file by creating an XMP sidecar.
-  /// 
+  ///
   /// Creates an XMP metadata file alongside the RAW file containing
   /// equipment and photographer information from the selection.
   pub fn apply_exif(path: &Path, selection: &Selection) -> Result<(), Box<dyn std::error::Error>> {
@@ -1011,7 +1032,7 @@ impl RawProcessor {
   }
 
   /// Erases EXIF metadata from a RAW file by removing its XMP sidecar.
-  /// 
+  ///
   /// Deletes the associated XMP metadata file if it exists,
   /// effectively removing all applied metadata.
   pub fn erase_exif(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -1023,7 +1044,7 @@ impl RawProcessor {
   }
 
   /// Reads EXIF metadata from a RAW file's XMP sidecar.
-  /// 
+  ///
   /// Returns the contents of the associated XMP file if it exists,
   /// or an empty vector if no XMP file is found.
   /// Read EXIF data from a JPEG file and return as key-value pairs
@@ -1038,12 +1059,16 @@ impl RawProcessor {
   }
 
   /// Applies EXIF metadata to a RAW file with optional custom shot ISO by creating an XMP sidecar.
-  /// 
-  /// Similar to apply_exif but allows overriding the ISO value for push/pull processing.
-  /// If shot_iso is None, uses the film's base ISO rating.
+  ///
+  /// Similar to `apply_exif` but allows overriding the ISO value for push/pull processing.
+  /// If `shot_iso` is None, uses the film's base ISO rating.
   /// Creates an XMP metadata file alongside the RAW file containing
   /// equipment and photographer information from the selection.
-  pub fn apply_exif_with_iso(path: &Path, selection: &Selection, shot_iso: Option<u32>) -> Result<(), Box<dyn std::error::Error>> {
+  pub fn apply_exif_with_iso(
+    path: &Path,
+    selection: &Selection,
+    shot_iso: Option<u32>,
+  ) -> Result<(), Box<dyn std::error::Error>> {
     let xmp_content = ExifTags::create_xmp_metadata_with_iso(selection, shot_iso);
     let xmp_path = path.with_extension("xmp");
     fs::write(&xmp_path, xmp_content)?;

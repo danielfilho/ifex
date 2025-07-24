@@ -1,5 +1,5 @@
 //! EXIF management and batch processing functionality.
-//! 
+//!
 //! This module provides the main interface for applying and erasing EXIF metadata
 //! from image files. It handles batch processing of directories, file type detection,
 //! and coordination with the appropriate file type processors.
@@ -10,7 +10,7 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 /// Result of a batch EXIF processing operation.
-/// 
+///
 /// Contains overall success status, descriptive message, and detailed
 /// statistics about the processing results.
 #[derive(Debug)]
@@ -24,7 +24,7 @@ pub struct ProcessingResult {
 }
 
 /// Statistics about files processed during an EXIF operation.
-/// 
+///
 /// Tracks the number of successfully processed files, failed files,
 /// and detailed results for each individual file.
 #[derive(Debug)]
@@ -38,7 +38,7 @@ pub struct ProcessingStats {
 }
 
 /// Result information for a single file processing operation.
-/// 
+///
 /// Contains the file name, success status, detected file type,
 /// and any error message if processing failed.
 #[derive(Debug)]
@@ -54,7 +54,7 @@ pub struct FileResult {
 }
 
 /// Main EXIF processing manager.
-/// 
+///
 /// Provides methods for batch processing of image files, handling both
 /// EXIF application and erasure operations across supported file formats.
 pub struct ExifManager;
@@ -66,27 +66,27 @@ impl ExifManager {
   }
 
   /// Processes all supported image files in a folder.
-  /// 
+  ///
   /// Walks through the specified folder (optionally recursively) and applies
   /// the requested operation ("apply" or "erase") to all supported image files.
   /// For "apply" operations, a Selection containing equipment information is required.
-  /// 
+  ///
   /// Returns a ProcessingResult with statistics and detailed results for each file.
-  pub async fn process_folder(
+  pub fn process_folder(
     &self,
     folder_path: &Path,
     selection: Option<&Selection>,
     operation: &str,
     recursive: bool,
   ) -> ProcessingResult {
-    self.process_folder_with_iso(folder_path, selection, operation, recursive, None).await
+    self.process_folder_with_iso(folder_path, selection, operation, recursive, None)
   }
 
   /// Walks through the specified folder with optional custom shot ISO.
-  /// 
+  ///
   /// Supports custom ISO for push/pull processing. If shot_iso is None, uses film's base ISO.
   /// Returns a ProcessingResult with statistics and detailed results for each file.
-  pub async fn process_folder_with_iso(
+  pub fn process_folder_with_iso(
     &self,
     folder_path: &Path,
     selection: Option<&Selection>,
@@ -121,8 +121,8 @@ impl ExifManager {
             let file_type = get_file_type(path);
 
             let result = match operation {
-              "apply" => self.apply_exif_with_iso(path, selection.unwrap(), shot_iso).await,
-              "erase" => self.erase_exif(path).await,
+              "apply" => self.apply_exif_with_iso(path, selection.unwrap(), shot_iso),
+              "erase" => self.erase_exif(path),
               _ => Err("Unknown operation".into()),
             };
 
@@ -170,11 +170,11 @@ impl ExifManager {
   }
 
   /// Applies EXIF metadata to a single image file.
-  /// 
+  ///
   /// Determines the file type and delegates to the appropriate processor
   /// to apply the EXIF metadata from the provided equipment selection.
   #[allow(dead_code)]
-  async fn apply_exif(
+  fn apply_exif(
     &self,
     path: &Path,
     selection: &Selection,
@@ -194,10 +194,10 @@ impl ExifManager {
   }
 
   /// Applies EXIF metadata to a single image file with optional custom shot ISO.
-  /// 
+  ///
   /// Determines the file type and delegates to the appropriate processor.
   /// If shot_iso is provided, uses that instead of the film's base ISO for push/pull processing.
-  async fn apply_exif_with_iso(
+  fn apply_exif_with_iso(
     &self,
     path: &Path,
     selection: &Selection,
@@ -218,10 +218,10 @@ impl ExifManager {
   }
 
   /// Erases EXIF metadata from a single image file.
-  /// 
+  ///
   /// Determines the file type and delegates to the appropriate processor
   /// to remove all EXIF metadata from the file.
-  async fn erase_exif(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+  fn erase_exif(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     use crate::exif::file_types::FileType;
     use crate::exif::processors::{JpegProcessor, RawProcessor, TiffProcessor};
 
@@ -237,10 +237,10 @@ impl ExifManager {
   }
 
   /// Reads EXIF metadata from an image file.
-  /// 
+  ///
   /// Determines the file type and delegates to the appropriate processor
   /// to extract all available EXIF metadata as key-value pairs.
-  /// 
+  ///
   /// Returns a vector of (tag_name, value) tuples sorted by tag name.
   pub fn read_exif_data(path: &Path) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
     use crate::exif::file_types::FileType;

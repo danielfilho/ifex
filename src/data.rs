@@ -1,14 +1,17 @@
 //! Data management layer for IFEX equipment and configuration operations.
-//! 
+//!
 //! This module provides a high-level interface for managing photography equipment
 //! data including cameras, lenses, films, photographers, and equipment setups.
 //! It wraps the configuration system and provides CRUD operations.
 
-use crate::{config::Config, models::*};
+use crate::{
+  config::Config,
+  models::{Camera, Film, Lens, Photographer, Selection, Setup},
+};
 use uuid::Uuid;
 
 /// Data manager for handling all equipment and configuration operations.
-/// 
+///
 /// This struct provides methods to add, retrieve, and delete photography equipment,
 /// as well as create complete equipment selections for EXIF metadata application.
 pub struct DataManager {
@@ -16,8 +19,8 @@ pub struct DataManager {
 }
 
 impl DataManager {
-  /// Creates a new DataManager by loading the configuration from disk.
-  /// 
+  /// Creates a new `DataManager` by loading the configuration from disk.
+  ///
   /// Returns an error if the configuration cannot be loaded.
   pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
     let config = Config::load()?;
@@ -25,14 +28,14 @@ impl DataManager {
   }
 
   /// Saves the current configuration to disk.
-  /// 
+  ///
   /// Returns an error if the configuration cannot be saved.
   pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
     self.config.save()
   }
 
   /// Adds a new camera to the configuration.
-  /// 
+  ///
   /// Creates a new camera with the specified maker and model, adds it to the
   /// configuration, and returns the created camera.
   pub fn add_camera(&mut self, maker: String, model: String) -> Camera {
@@ -42,7 +45,7 @@ impl DataManager {
   }
 
   /// Adds a new lens to the configuration.
-  /// 
+  ///
   /// Creates a new lens with the specified parameters, adds it to the
   /// configuration, and returns the created lens.
   pub fn add_lens(
@@ -59,7 +62,7 @@ impl DataManager {
   }
 
   /// Adds a new film stock to the configuration.
-  /// 
+  ///
   /// Creates a new film with the specified maker, name, and ISO rating,
   /// adds it to the configuration, and returns the created film.
   pub fn add_film(&mut self, maker: String, name: String, iso: u32) -> Film {
@@ -69,7 +72,7 @@ impl DataManager {
   }
 
   /// Adds a new photographer to the configuration.
-  /// 
+  ///
   /// Creates a new photographer with the specified name and optional email,
   /// adds it to the configuration, and returns the created photographer.
   pub fn add_photographer(&mut self, name: String, email: Option<String>) -> Photographer {
@@ -79,7 +82,7 @@ impl DataManager {
   }
 
   /// Adds a new equipment setup to the configuration.
-  /// 
+  ///
   /// Creates a new setup that combines a camera and lens. Returns an error
   /// if either the camera or lens ID cannot be found in the configuration.
   pub fn add_setup(
@@ -101,67 +104,77 @@ impl DataManager {
   }
 
   /// Returns a reference to all cameras in the configuration.
-  pub fn get_cameras(&self) -> &Vec<Camera> {
+  #[must_use]
+  pub const fn get_cameras(&self) -> &Vec<Camera> {
     &self.config.cameras
   }
 
   /// Returns a reference to all lenses in the configuration.
-  pub fn get_lenses(&self) -> &Vec<Lens> {
+  #[must_use]
+  pub const fn get_lenses(&self) -> &Vec<Lens> {
     &self.config.lenses
   }
 
   /// Returns a reference to all films in the configuration.
-  pub fn get_films(&self) -> &Vec<Film> {
+  #[must_use]
+  pub const fn get_films(&self) -> &Vec<Film> {
     &self.config.films
   }
 
   /// Returns a reference to all photographers in the configuration.
-  pub fn get_photographers(&self) -> &Vec<Photographer> {
+  #[must_use]
+  pub const fn get_photographers(&self) -> &Vec<Photographer> {
     &self.config.photographers
   }
 
   /// Returns a reference to all setups in the configuration.
-  pub fn get_setups(&self) -> &Vec<Setup> {
+  #[must_use]
+  pub const fn get_setups(&self) -> &Vec<Setup> {
     &self.config.setups
   }
 
   /// Finds a camera by its unique ID.
-  /// 
+  ///
   /// Returns `Some(&Camera)` if found, `None` otherwise.
+  #[must_use]
   pub fn get_camera_by_id(&self, id: Uuid) -> Option<&Camera> {
     self.config.cameras.iter().find(|c| c.id == id)
   }
 
   /// Finds a lens by its unique ID.
-  /// 
+  ///
   /// Returns `Some(&Lens)` if found, `None` otherwise.
+  #[must_use]
   pub fn get_lens_by_id(&self, id: Uuid) -> Option<&Lens> {
     self.config.lenses.iter().find(|l| l.id == id)
   }
 
   /// Finds a film by its unique ID.
-  /// 
+  ///
   /// Returns `Some(&Film)` if found, `None` otherwise.
+  #[must_use]
   pub fn get_film_by_id(&self, id: Uuid) -> Option<&Film> {
     self.config.films.iter().find(|f| f.id == id)
   }
 
   /// Finds a photographer by their unique ID.
-  /// 
+  ///
   /// Returns `Some(&Photographer)` if found, `None` otherwise.
+  #[must_use]
   pub fn get_photographer_by_id(&self, id: Uuid) -> Option<&Photographer> {
     self.config.photographers.iter().find(|p| p.id == id)
   }
 
   /// Finds a setup by its unique ID.
-  /// 
+  ///
   /// Returns `Some(&Setup)` if found, `None` otherwise.
+  #[must_use]
   pub fn get_setup_by_id(&self, id: Uuid) -> Option<&Setup> {
     self.config.setups.iter().find(|s| s.id == id)
   }
 
   /// Creates a complete equipment selection for EXIF metadata application.
-  /// 
+  ///
   /// Combines a setup (camera + lens), film, and photographer into a single
   /// Selection object that contains all necessary information for applying
   /// EXIF metadata to images. Returns an error if any of the specified IDs
@@ -192,7 +205,7 @@ impl DataManager {
   }
 
   /// Deletes a camera from the configuration.
-  /// 
+  ///
   /// Returns an error if the camera is currently used in any setups.
   /// This prevents data integrity issues by ensuring referenced cameras
   /// are not deleted.
@@ -205,7 +218,7 @@ impl DataManager {
   }
 
   /// Deletes a lens from the configuration.
-  /// 
+  ///
   /// Returns an error if the lens is currently used in any setups.
   /// This prevents data integrity issues by ensuring referenced lenses
   /// are not deleted.
@@ -218,7 +231,7 @@ impl DataManager {
   }
 
   /// Deletes a film from the configuration.
-  /// 
+  ///
   /// Films can be safely deleted without checking for references
   /// since they are not referenced by other entities.
   pub fn delete_film(&mut self, id: Uuid) {
@@ -226,7 +239,7 @@ impl DataManager {
   }
 
   /// Deletes a photographer from the configuration.
-  /// 
+  ///
   /// Photographers can be safely deleted without checking for references
   /// since they are not referenced by other entities.
   pub fn delete_photographer(&mut self, id: Uuid) {
@@ -234,7 +247,7 @@ impl DataManager {
   }
 
   /// Deletes a setup from the configuration.
-  /// 
+  ///
   /// Setups can be safely deleted without checking for references
   /// since they are not referenced by other entities.
   pub fn delete_setup(&mut self, id: Uuid) {
@@ -242,7 +255,7 @@ impl DataManager {
   }
 
   /// Updates an existing camera in the configuration.
-  /// 
+  ///
   /// Returns true if the camera was found and updated, false otherwise.
   pub fn edit_camera(&mut self, id: Uuid, maker: String, model: String) -> bool {
     if let Some(camera) = self.config.cameras.iter_mut().find(|c| c.id == id) {
@@ -255,9 +268,17 @@ impl DataManager {
   }
 
   /// Updates an existing lens in the configuration.
-  /// 
+  ///
   /// Returns true if the lens was found and updated, false otherwise.
-  pub fn edit_lens(&mut self, id: Uuid, maker: String, model: String, focal_length: String, aperture: String, mount: String) -> bool {
+  pub fn edit_lens(
+    &mut self,
+    id: Uuid,
+    maker: String,
+    model: String,
+    focal_length: String,
+    aperture: String,
+    mount: String,
+  ) -> bool {
     if let Some(lens) = self.config.lenses.iter_mut().find(|l| l.id == id) {
       lens.maker = maker;
       lens.model = model;
@@ -271,7 +292,7 @@ impl DataManager {
   }
 
   /// Updates an existing film in the configuration.
-  /// 
+  ///
   /// Returns true if the film was found and updated, false otherwise.
   pub fn edit_film(&mut self, id: Uuid, maker: String, name: String, iso: u32) -> bool {
     if let Some(film) = self.config.films.iter_mut().find(|f| f.id == id) {
@@ -285,7 +306,7 @@ impl DataManager {
   }
 
   /// Updates an existing photographer in the configuration.
-  /// 
+  ///
   /// Returns true if the photographer was found and updated, false otherwise.
   pub fn edit_photographer(&mut self, id: Uuid, name: String, email: Option<String>) -> bool {
     if let Some(photographer) = self.config.photographers.iter_mut().find(|p| p.id == id) {
@@ -298,9 +319,15 @@ impl DataManager {
   }
 
   /// Updates an existing setup in the configuration.
-  /// 
+  ///
   /// Returns true if the setup was found and updated, false otherwise.
-  pub fn edit_setup(&mut self, id: Uuid, name: String, camera_id: Uuid, lens_id: Uuid) -> Result<bool, String> {
+  pub fn edit_setup(
+    &mut self,
+    id: Uuid,
+    name: String,
+    camera_id: Uuid,
+    lens_id: Uuid,
+  ) -> Result<bool, String> {
     // Validate that the referenced camera and lens exist
     if self.get_camera_by_id(camera_id).is_none() {
       return Err("Camera not found".to_string());

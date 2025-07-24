@@ -23,7 +23,7 @@ pub mod utils;
 pub use cli::*;
 pub use config::*;
 pub use data::*;
-pub use exif::*;
+pub use exif::ExifManager;
 pub use interface::*;
 pub use models::*;
 

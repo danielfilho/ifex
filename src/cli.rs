@@ -38,6 +38,7 @@ pub enum Commands {
 
 impl Cli {
   /// Parse command-line arguments and return a Cli instance
+  #[must_use]
   pub fn parse_args() -> Self {
     Self::parse()
   }

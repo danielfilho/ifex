@@ -1,7 +1,11 @@
 //! IFEX CLI application entry point
 
-use colored::*;
-use ifex::{cli::*, interface::Interface, *};
+use colored::Colorize;
+use ifex::{
+  cli::{Cli, Commands},
+  interface::Interface,
+  Result,
+};
 use std::process;
 
 /// Main application entry point
@@ -12,13 +16,12 @@ async fn main() {
   let result = match &cli.command {
     Some(Commands::Run) => run_interactive().await,
     Some(Commands::Manage) => run_management().await,
-    Some(Commands::Check { file }) => check_exif_data(file).await,
-    Some(Commands::Read { file }) => check_exif_data(file).await,
+    Some(Commands::Check { file } | Commands::Read { file }) => check_exif_data(file).await,
     None => run_interactive().await,
   };
 
   if let Err(e) = result {
-    eprintln!("{}", format!("Error: {}", e).red());
+    eprintln!("{}", format!("Error: {e}").red());
     process::exit(1);
   }
 }
@@ -95,7 +98,7 @@ async fn check_exif_data(file: &std::path::Path) -> Result<()> {
       }
     }
     Err(e) => {
-      println!("{}", format!("❌ Error reading EXIF data: {}", e).red());
+      println!("{}", format!("❌ Error reading EXIF data: {e}").red());
     }
   }
 
