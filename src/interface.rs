@@ -4,8 +4,8 @@
 //! interactively apply or erase EXIF data from images, as well as manage
 //! their photography equipment database through various menu systems.
 
-use crate::{data::DataManager, models::*, prompts::PromptUtils, utils::clean_path};
-use colored::*;
+use crate::{data::DataManager, models::{Selection, Setup, Film, Photographer, Camera, Lens}, prompts::PromptUtils, utils::clean_path};
+use colored::Colorize;
 use std::path::PathBuf;
 
 /// Main application interface providing interactive menu systems.
@@ -44,18 +44,18 @@ impl Interface {
       if let Some(choice) = PromptUtils::select_from_list("What would you like to do?", options)? {
         match choice {
           "Apply EXIF data to images" => {
-            if let Err(e) = self.handle_apply_exif() {
-              eprintln!("{}", format!("Error: {}", e).red());
+            if let Err(e) = self.handle_apply_exif().await {
+              eprintln!("{}", format!("Error: {e}").red());
             }
           }
           "Erase EXIF data from images" => {
-            if let Err(e) = self.handle_erase_exif() {
-              eprintln!("{}", format!("Error: {}", e).red());
+            if let Err(e) = self.handle_erase_exif().await {
+              eprintln!("{}", format!("Error: {e}").red());
             }
           }
-          "Manage Data" => {
-            if let Err(e) = self.run_management_menu() {
-              eprintln!("{}", format!("Error: {}", e).red());
+          "Manage equipment" => {
+            if let Err(e) = self.run_management_menu().await {
+              eprintln!("{}", format!("Error: {e}").red());
             }
           }
           "Exit" => {
@@ -75,8 +75,8 @@ impl Interface {
   ///
   /// Guides the user through selecting equipment, choosing a folder path,
   /// and applying EXIF metadata to supported image files in the specified location.
-  fn handle_apply_exif(&self) -> Result<(), Box<dyn std::error::Error>> {
-    let (selection, shot_iso) = self.select_setup_film_and_iso()?;
+  async fn handle_apply_exif(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    let (selection, shot_iso) = self.select_setup_film_and_iso().await?;
     if selection.is_none() || shot_iso.is_none() {
       println!(
         "{}",
@@ -104,13 +104,14 @@ impl Interface {
     println!("{}", "\n📝 Applying EXIF data...\n".blue());
 
     let exif_manager = crate::ExifManager::new();
-    let result = exif_manager.process_folder_with_iso(
-      &_folder_path,
-      Some(&selection),
-      "apply",
-      _recursive,
-      Some(shot_iso),
-    );
+    let result = exif_manager
+      .process_folder_with_iso(
+        &_folder_path,
+        Some(&selection),
+        "apply",
+        _recursive,
+        Some(shot_iso),
+      );
 
     if result.success {
       println!(
@@ -147,7 +148,7 @@ impl Interface {
           type_label.as_str().bright_black()
         );
         if let Some(error) = &file.error {
-          println!("    {}", format!("Error: {}", error).red());
+          println!("    {}", format!("Error: {error}").red());
         }
       }
     } else {
@@ -160,7 +161,7 @@ impl Interface {
   ///
   /// Guides the user through selecting a folder path and confirmation,
   /// then erases EXIF metadata from supported image files in the specified location.
-  fn handle_erase_exif(&self) -> Result<(), Box<dyn std::error::Error>> {
+  async fn handle_erase_exif(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     let folder_path = self.prompt_folder_path()?;
     if folder_path.is_none() {
       return Ok(());
@@ -182,7 +183,8 @@ impl Interface {
     println!("{}", "\n🗑️  Erasing EXIF data...\n".blue());
 
     let exif_manager = crate::ExifManager::new();
-    let result = exif_manager.process_folder(&_folder_path, None, "erase", _recursive);
+    let result = exif_manager
+      .process_folder(&_folder_path, None, "erase", _recursive);
 
     if result.success {
       println!(
@@ -219,7 +221,7 @@ impl Interface {
           type_label.as_str().bright_black()
         );
         if let Some(error) = &file.error {
-          println!("    {}", format!("Error: {}", error).red());
+          println!("    {}", format!("Error: {error}").red());
         }
       }
     } else {
@@ -233,7 +235,7 @@ impl Interface {
   /// Prompts the user to select a setup (camera + lens), film, photographer, and ISO,
   /// then creates a Selection object containing all the necessary information
   /// for EXIF metadata application.
-  fn select_setup_film_and_iso(
+  async fn select_setup_film_and_iso(
     &self,
   ) -> Result<(Option<Selection>, Option<u32>), Box<dyn std::error::Error>> {
     let setups = self.data_manager.get_setups();
@@ -245,7 +247,7 @@ impl Interface {
       return Ok((None, None));
     }
 
-    let setup_options: Vec<String> = setups.iter().map(|s| s.display_name()).collect();
+    let setup_options: Vec<String> = setups.iter().map(Setup::display_name).collect();
     let selected_setup_name = PromptUtils::select_from_list("Select a setup:", setup_options)?;
     if selected_setup_name.is_none() {
       return Ok((None, None));
@@ -265,7 +267,7 @@ impl Interface {
       return Ok((None, None));
     }
 
-    let film_options: Vec<String> = films.iter().map(|f| f.display_name()).collect();
+    let film_options: Vec<String> = films.iter().map(Film::display_name).collect();
     let selected_film_name = PromptUtils::select_from_list("Select a film:", film_options)?;
     if selected_film_name.is_none() {
       return Ok((None, None));
@@ -293,7 +295,7 @@ impl Interface {
     let shot_iso = shot_iso.unwrap();
 
     let photographer_options: Vec<String> =
-      photographers.iter().map(|p| p.display_name()).collect();
+      photographers.iter().map(Photographer::display_name).collect();
     let selected_photographer_name =
       PromptUtils::select_from_list("Select a photographer:", photographer_options)?;
     if selected_photographer_name.is_none() {
@@ -312,7 +314,7 @@ impl Interface {
         selected_film.id,
         selected_photographer.id,
       )
-      .map_err(|e| format!("Error creating selection: {}", e))?;
+      .map_err(|e| format!("Error creating selection: {e}"))?;
 
     Ok((Some(selection), Some(shot_iso)))
   }
@@ -322,31 +324,25 @@ impl Interface {
   /// Defaults to the film's base ISO rating. Useful for push/pull processing.
   /// Returns None if the user cancels the operation.
   fn prompt_shot_iso(&self, default_iso: u32) -> Result<Option<u32>, Box<dyn std::error::Error>> {
-    println!("{}", format!("📸 Film base ISO: {}", default_iso).cyan());
+    println!("{}", format!("📸 Film base ISO: {default_iso}").cyan());
 
     let prompt_text = format!(
-      "Enter the ISO speed you shot at (press Enter for {}): ",
-      default_iso
+      "Enter the ISO speed you shot at (press Enter for {default_iso}): "
     );
 
     if let Some(input) = PromptUtils::prompt_text(&prompt_text)? {
       if input.trim().is_empty() {
         Ok(Some(default_iso))
-      } else {
-        match input.trim().parse::<u32>() {
-          Ok(iso) => {
-            if iso > 0 && iso <= 6400 {
-              Ok(Some(iso))
-            } else {
-              println!("{}", "❌ ISO must be between 1 and 6400".red());
-              self.prompt_shot_iso(default_iso)
-            }
-          }
-          Err(_) => {
-            println!("{}", "❌ Invalid ISO value. Please enter a number.".red());
-            self.prompt_shot_iso(default_iso)
-          }
+      } else if let Ok(iso) = input.trim().parse::<u32>() {
+        if iso > 0 && iso <= 6400 {
+          Ok(Some(iso))
+        } else {
+          println!("{}", "❌ ISO must be between 1 and 6400".red());
+          self.prompt_shot_iso(default_iso)
         }
+      } else {
+        println!("{}", "❌ Invalid ISO value. Please enter a number.".red());
+        self.prompt_shot_iso(default_iso)
       }
     } else {
       Ok(None)
@@ -389,7 +385,11 @@ impl Interface {
   ///
   /// Provides options to manage cameras, lenses, films, photographers, and setups.
   /// Returns to the main menu when the user selects "Back to main menu".
-  pub fn run_management_menu(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if there are issues with user prompts or data management operations.
+  pub async fn run_management_menu(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     loop {
       let options = vec![
         "Manage Cameras",
@@ -402,11 +402,11 @@ impl Interface {
 
       if let Some(choice) = PromptUtils::select_from_list("Equipment Management", options)? {
         match choice {
-          "Manage Cameras" => self.manage_cameras()?,
-          "Manage Lenses" => self.manage_lenses()?,
-          "Manage Films" => self.manage_films()?,
-          "Manage Photographers" => self.manage_photographers()?,
-          "Manage Setups" => self.manage_setups()?,
+          "Manage Cameras" => self.manage_cameras().await?,
+          "Manage Lenses" => self.manage_lenses().await?,
+          "Manage Films" => self.manage_films().await?,
+          "Manage Photographers" => self.manage_photographers().await?,
+          "Manage Setups" => self.manage_setups().await?,
           "Back to main menu" => break,
           _ => {}
         }
@@ -421,7 +421,7 @@ impl Interface {
   ///
   /// Provides options to view, add, and delete cameras in the configuration.
   /// Prevents deletion of cameras that are currently used in setups.
-  fn manage_cameras(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  async fn manage_cameras(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "\n📷 Camera Management\n".blue().bold());
 
     loop {
@@ -464,7 +464,7 @@ impl Interface {
             if cameras.is_empty() {
               println!("{}", "No cameras to edit.".yellow());
             } else {
-              let camera_options: Vec<String> = cameras.iter().map(|c| c.display_name()).collect();
+              let camera_options: Vec<String> = cameras.iter().map(Camera::display_name).collect();
               if let Some(selected_name) =
                 PromptUtils::select_from_list("Select camera to edit:", camera_options)?
               {
@@ -476,7 +476,7 @@ impl Interface {
                   ) {
                     if self.data_manager.edit_camera(camera.id, maker, model) {
                       self.data_manager.save()?;
-                      println!("{}", format!("✅ Updated camera: {}", old_name).green());
+                      println!("{}", format!("✅ Updated camera: {old_name}").green());
                     } else {
                       println!("{}", "❌ Failed to update camera.".red());
                     }
@@ -490,7 +490,7 @@ impl Interface {
             if cameras.is_empty() {
               println!("{}", "No cameras to delete.".yellow());
             } else {
-              let camera_options: Vec<String> = cameras.iter().map(|c| c.display_name()).collect();
+              let camera_options: Vec<String> = cameras.iter().map(Camera::display_name).collect();
               if let Some(selected_name) =
                 PromptUtils::select_from_list("Select camera to delete:", camera_options)?
               {
@@ -498,12 +498,12 @@ impl Interface {
                   let camera_id = camera.id;
                   let camera_name = camera.display_name();
                   match self.data_manager.delete_camera(camera_id) {
-                    Ok(_) => {
+                    Ok(()) => {
                       self.data_manager.save()?;
-                      println!("{}", format!("✅ Deleted camera: {}", camera_name).green());
+                      println!("{}", format!("✅ Deleted camera: {camera_name}").green());
                     }
                     Err(e) => {
-                      println!("{}", format!("❌ Error: {}", e).red());
+                      println!("{}", format!("❌ Error: {e}").red());
                     }
                   }
                 }
@@ -524,7 +524,7 @@ impl Interface {
   ///
   /// Provides options to view, add, and delete lenses in the configuration.
   /// Prevents deletion of lenses that are currently used in setups.
-  fn manage_lenses(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  async fn manage_lenses(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "\n🔍 Lens Management\n".blue().bold());
 
     loop {
@@ -572,7 +572,7 @@ impl Interface {
             if lenses.is_empty() {
               println!("{}", "No lenses to edit.".yellow());
             } else {
-              let lens_options: Vec<String> = lenses.iter().map(|l| l.display_name()).collect();
+              let lens_options: Vec<String> = lenses.iter().map(Lens::display_name).collect();
               if let Some(selected_name) =
                 PromptUtils::select_from_list("Select lens to edit:", lens_options)?
               {
@@ -606,7 +606,7 @@ impl Interface {
                       mount,
                     ) {
                       self.data_manager.save()?;
-                      println!("{}", format!("✅ Updated lens: {}", old_name).green());
+                      println!("{}", format!("✅ Updated lens: {old_name}").green());
                     } else {
                       println!("{}", "❌ Failed to update lens.".red());
                     }
@@ -620,7 +620,7 @@ impl Interface {
             if lenses.is_empty() {
               println!("{}", "No lenses to delete.".yellow());
             } else {
-              let lens_options: Vec<String> = lenses.iter().map(|l| l.display_name()).collect();
+              let lens_options: Vec<String> = lenses.iter().map(Lens::display_name).collect();
               if let Some(selected_name) =
                 PromptUtils::select_from_list("Select lens to delete:", lens_options)?
               {
@@ -628,12 +628,12 @@ impl Interface {
                   let lens_id = lens.id;
                   let lens_name = lens.display_name();
                   match self.data_manager.delete_lens(lens_id) {
-                    Ok(_) => {
+                    Ok(()) => {
                       self.data_manager.save()?;
-                      println!("{}", format!("✅ Deleted lens: {}", lens_name).green());
+                      println!("{}", format!("✅ Deleted lens: {lens_name}").green());
                     }
                     Err(e) => {
-                      println!("{}", format!("❌ Error: {}", e).red());
+                      println!("{}", format!("❌ Error: {e}").red());
                     }
                   }
                 }
@@ -654,7 +654,7 @@ impl Interface {
   ///
   /// Provides options to view, add, and delete film stocks in the configuration.
   /// Films can be deleted without restriction as they are not referenced by other entities.
-  fn manage_films(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  async fn manage_films(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "\n🎞️ Film Management\n".blue().bold());
 
     loop {
@@ -698,7 +698,7 @@ impl Interface {
             if films.is_empty() {
               println!("{}", "No films to edit.".yellow());
             } else {
-              let film_options: Vec<String> = films.iter().map(|f| f.display_name()).collect();
+              let film_options: Vec<String> = films.iter().map(Film::display_name).collect();
               if let Some(selected_name) =
                 PromptUtils::select_from_list("Select film to edit:", film_options)?
               {
@@ -711,7 +711,7 @@ impl Interface {
                   ) {
                     if self.data_manager.edit_film(film.id, maker, name, iso) {
                       self.data_manager.save()?;
-                      println!("{}", format!("✅ Updated film: {}", old_name).green());
+                      println!("{}", format!("✅ Updated film: {old_name}").green());
                     } else {
                       println!("{}", "❌ Failed to update film.".red());
                     }
@@ -725,7 +725,7 @@ impl Interface {
             if films.is_empty() {
               println!("{}", "No films to delete.".yellow());
             } else {
-              let film_options: Vec<String> = films.iter().map(|f| f.display_name()).collect();
+              let film_options: Vec<String> = films.iter().map(Film::display_name).collect();
               if let Some(selected_name) =
                 PromptUtils::select_from_list("Select film to delete:", film_options)?
               {
@@ -734,7 +734,7 @@ impl Interface {
                   let film_name = film.display_name();
                   self.data_manager.delete_film(film_id);
                   self.data_manager.save()?;
-                  println!("{}", format!("✅ Deleted film: {}", film_name).green());
+                  println!("{}", format!("✅ Deleted film: {film_name}").green());
                 }
               }
             }
@@ -753,7 +753,7 @@ impl Interface {
   ///
   /// Provides options to view, add, and delete photographers in the configuration.
   /// Photographers can be deleted without restriction as they are not referenced by other entities.
-  fn manage_photographers(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  async fn manage_photographers(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "\n👤 Photographer Management\n".blue().bold());
 
     loop {
@@ -801,7 +801,7 @@ impl Interface {
               println!("{}", "No photographers to edit.".yellow());
             } else {
               let photographer_options: Vec<String> =
-                photographers.iter().map(|p| p.display_name()).collect();
+                photographers.iter().map(Photographer::display_name).collect();
               if let Some(selected_name) =
                 PromptUtils::select_from_list("Select photographer to edit:", photographer_options)?
               {
@@ -829,7 +829,7 @@ impl Interface {
                       self.data_manager.save()?;
                       println!(
                         "{}",
-                        format!("✅ Updated photographer: {}", old_name).green()
+                        format!("✅ Updated photographer: {old_name}").green()
                       );
                     } else {
                       println!("{}", "❌ Failed to update photographer.".red());
@@ -845,7 +845,7 @@ impl Interface {
               println!("{}", "No photographers to delete.".yellow());
             } else {
               let photographer_options: Vec<String> =
-                photographers.iter().map(|p| p.display_name()).collect();
+                photographers.iter().map(Photographer::display_name).collect();
               if let Some(selected_name) = PromptUtils::select_from_list(
                 "Select photographer to delete:",
                 photographer_options,
@@ -860,7 +860,7 @@ impl Interface {
                   self.data_manager.save()?;
                   println!(
                     "{}",
-                    format!("✅ Deleted photographer: {}", photographer_name).green()
+                    format!("✅ Deleted photographer: {photographer_name}").green()
                   );
                 }
               }
@@ -880,7 +880,7 @@ impl Interface {
   ///
   /// Provides options to view, add, and delete equipment setups (camera + lens combinations).
   /// Validates that referenced cameras and lenses exist before creating new setups.
-  fn manage_setups(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  async fn manage_setups(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "\n⚙️ Setup Management\n".blue().bold());
 
     loop {
@@ -935,23 +935,23 @@ impl Interface {
             }
 
             if let Some(name) = PromptUtils::prompt_text("Setup name:")? {
-              let camera_options: Vec<String> = cameras.iter().map(|c| c.display_name()).collect();
+              let camera_options: Vec<String> = cameras.iter().map(Camera::display_name).collect();
               if let Some(selected_camera_name) =
                 PromptUtils::select_from_list("Select camera:", camera_options)?
               {
                 let selected_camera = cameras
                   .iter()
                   .find(|c| c.display_name() == selected_camera_name)
-                  .unwrap();
+                  .expect("Selected camera should exist");
 
-                let lens_options: Vec<String> = lenses.iter().map(|l| l.display_name()).collect();
+                let lens_options: Vec<String> = lenses.iter().map(Lens::display_name).collect();
                 if let Some(selected_lens_name) =
                   PromptUtils::select_from_list("Select lens:", lens_options)?
                 {
                   let selected_lens = lenses
                     .iter()
                     .find(|l| l.display_name() == selected_lens_name)
-                    .unwrap();
+                    .expect("Selected lens should exist");
 
                   match self
                     .data_manager
@@ -965,7 +965,7 @@ impl Interface {
                       );
                     }
                     Err(e) => {
-                      println!("{}", format!("❌ Error: {}", e).red());
+                      println!("{}", format!("❌ Error: {e}").red());
                     }
                   }
                 }
@@ -977,7 +977,7 @@ impl Interface {
             if setups.is_empty() {
               println!("{}", "No setups to edit.".yellow());
             } else {
-              let setup_options: Vec<String> = setups.iter().map(|s| s.display_name()).collect();
+              let setup_options: Vec<String> = setups.iter().map(Setup::display_name).collect();
               if let Some(selected_name) =
                 PromptUtils::select_from_list("Select setup to edit:", setup_options)?
               {
@@ -1006,24 +1006,24 @@ impl Interface {
                     PromptUtils::prompt_text_with_default("Setup name:", &setup.name)?
                   {
                     let camera_options: Vec<String> =
-                      cameras.iter().map(|c| c.display_name()).collect();
+                      cameras.iter().map(Camera::display_name).collect();
                     if let Some(selected_camera_name) =
                       PromptUtils::select_from_list("Select camera:", camera_options)?
                     {
                       let selected_camera = cameras
                         .iter()
                         .find(|c| c.display_name() == selected_camera_name)
-                        .unwrap();
+                        .expect("Selected camera should exist");
 
                       let lens_options: Vec<String> =
-                        lenses.iter().map(|l| l.display_name()).collect();
+                        lenses.iter().map(Lens::display_name).collect();
                       if let Some(selected_lens_name) =
                         PromptUtils::select_from_list("Select lens:", lens_options)?
                       {
                         let selected_lens = lenses
                           .iter()
                           .find(|l| l.display_name() == selected_lens_name)
-                          .unwrap();
+                          .expect("Selected lens should exist");
 
                         match self.data_manager.edit_setup(
                           setup.id,
@@ -1033,13 +1033,13 @@ impl Interface {
                         ) {
                           Ok(true) => {
                             self.data_manager.save()?;
-                            println!("{}", format!("✅ Updated setup: {}", old_name).green());
+                            println!("{}", format!("✅ Updated setup: {old_name}").green());
                           }
                           Ok(false) => {
                             println!("{}", "❌ Failed to update setup.".red());
                           }
                           Err(e) => {
-                            println!("{}", format!("❌ Error: {}", e).red());
+                            println!("{}", format!("❌ Error: {e}").red());
                           }
                         }
                       }
@@ -1054,7 +1054,7 @@ impl Interface {
             if setups.is_empty() {
               println!("{}", "No setups to delete.".yellow());
             } else {
-              let setup_options: Vec<String> = setups.iter().map(|s| s.display_name()).collect();
+              let setup_options: Vec<String> = setups.iter().map(Setup::display_name).collect();
               if let Some(selected_name) =
                 PromptUtils::select_from_list("Select setup to delete:", setup_options)?
               {
@@ -1063,7 +1063,7 @@ impl Interface {
                   let setup_name = setup.display_name();
                   self.data_manager.delete_setup(setup_id);
                   self.data_manager.save()?;
-                  println!("{}", format!("✅ Deleted setup: {}", setup_name).green());
+                  println!("{}", format!("✅ Deleted setup: {setup_name}").green());
                 }
               }
             }

@@ -14,10 +14,9 @@ async fn main() {
   let cli = Cli::parse_args();
 
   let result = match &cli.command {
-    Some(Commands::Run) => run_interactive().await,
-    Some(Commands::Manage) => run_management(),
+    Some(Commands::Manage) => run_management().await,
     Some(Commands::Check { file } | Commands::Read { file }) => check_exif_data(file).await,
-    None => run_interactive().await,
+    Some(Commands::Run) | None => run_interactive().await,
   };
 
   if let Err(e) = result {
@@ -36,11 +35,11 @@ async fn run_interactive() -> Result<()> {
 }
 
 /// Run the equipment management interface
-fn run_management() -> Result<()> {
+async fn run_management() -> Result<()> {
   println!("{}", "🏷️  IFEX - Equipment Manager\n".blue());
 
   let mut interface = Interface::new()?;
-  interface.run_management_menu()?;
+  interface.run_management_menu().await?;
   Ok(())
 }
 

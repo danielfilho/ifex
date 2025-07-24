@@ -59,9 +59,15 @@ pub struct FileResult {
 /// EXIF application and erasure operations across supported file formats.
 pub struct ExifManager;
 
+impl Default for ExifManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ExifManager {
-  /// Creates a new ExifManager instance.
-  pub fn new() -> Self {
+  /// Creates a new `ExifManager` instance.
+  #[must_use] pub const fn new() -> Self {
     Self
   }
 
@@ -71,8 +77,8 @@ impl ExifManager {
   /// the requested operation ("apply" or "erase") to all supported image files.
   /// For "apply" operations, a Selection containing equipment information is required.
   ///
-  /// Returns a ProcessingResult with statistics and detailed results for each file.
-  pub fn process_folder(
+  /// Returns a `ProcessingResult` with statistics and detailed results for each file.
+  #[must_use] pub fn process_folder(
     &self,
     folder_path: &Path,
     selection: Option<&Selection>,
@@ -84,9 +90,9 @@ impl ExifManager {
 
   /// Walks through the specified folder with optional custom shot ISO.
   ///
-  /// Supports custom ISO for push/pull processing. If shot_iso is None, uses film's base ISO.
-  /// Returns a ProcessingResult with statistics and detailed results for each file.
-  pub fn process_folder_with_iso(
+  /// Supports custom ISO for push/pull processing. If `shot_iso` is None, uses film's base ISO.
+  /// Returns a `ProcessingResult` with statistics and detailed results for each file.
+  #[must_use] pub fn process_folder_with_iso(
     &self,
     folder_path: &Path,
     selection: Option<&Selection>,
@@ -127,7 +133,7 @@ impl ExifManager {
             };
 
             match result {
-              Ok(_) => {
+              Ok(()) => {
                 stats.processed += 1;
                 stats.files.push(FileResult {
                   name: file_name,
@@ -149,7 +155,7 @@ impl ExifManager {
           }
         }
         Err(e) => {
-          eprintln!("Error reading directory entry: {}", e);
+          eprintln!("Error reading directory entry: {e}");
         }
       }
     }
@@ -196,7 +202,7 @@ impl ExifManager {
   /// Applies EXIF metadata to a single image file with optional custom shot ISO.
   ///
   /// Determines the file type and delegates to the appropriate processor.
-  /// If shot_iso is provided, uses that instead of the film's base ISO for push/pull processing.
+  /// If `shot_iso` is provided, uses that instead of the film's base ISO for push/pull processing.
   fn apply_exif_with_iso(
     &self,
     path: &Path,
@@ -241,7 +247,7 @@ impl ExifManager {
   /// Determines the file type and delegates to the appropriate processor
   /// to extract all available EXIF metadata as key-value pairs.
   ///
-  /// Returns a vector of (tag_name, value) tuples sorted by tag name.
+  /// Returns a vector of (`tag_name`, value) tuples sorted by tag name.
   pub fn read_exif_data(path: &Path) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
     use crate::exif::file_types::FileType;
     use crate::exif::processors::{JpegProcessor, RawProcessor, TiffProcessor};

@@ -20,6 +20,10 @@ impl PromptUtils {
   /// Converts `InquireError::OperationCanceled` to None, preserves successful
   /// results as Some(T), and propagates other errors. Shows a user-friendly
   /// message when operations are cancelled.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if the inquire operation fails for reasons other than cancellation.
   pub fn handle_cancellation<T>(
     result: Result<T, InquireError>,
   ) -> Result<Option<T>, Box<dyn std::error::Error>> {
@@ -37,6 +41,10 @@ impl PromptUtils {
   ///
   /// Shows the provided message and waits for user input.
   /// Returns None if the user cancels the operation.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if the prompt fails for reasons other than user cancellation.
   pub fn prompt_text(message: &str) -> Result<Option<String>, Box<dyn std::error::Error>> {
     let result = Text::new(message).prompt();
     Self::handle_cancellation(result)
@@ -46,6 +54,10 @@ impl PromptUtils {
   ///
   /// Shows the provided message and waits for user input, pre-filling with the default.
   /// Returns None if the user cancels the operation.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if the prompt fails for reasons other than user cancellation.
   pub fn prompt_text_with_default(
     message: &str,
     default: &str,
@@ -58,6 +70,10 @@ impl PromptUtils {
   ///
   /// Shows the provided message with a default value.
   /// Returns None if the user cancels the operation.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if the prompt fails for reasons other than user cancellation.
   pub fn prompt_confirm(
     message: &str,
     default: bool,
@@ -70,6 +86,10 @@ impl PromptUtils {
   ///
   /// Shows the provided message and parses the input to the specified numeric type.
   /// Returns None if the user cancels the operation or if parsing fails.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if the prompt fails for reasons other than user cancellation or parsing errors.
   pub fn prompt_number<T>(message: &str) -> Result<Option<T>, Box<dyn std::error::Error>>
   where
     T: std::str::FromStr + Clone + std::fmt::Display,
@@ -83,6 +103,10 @@ impl PromptUtils {
   ///
   /// Shows the provided message and waits for numeric input, pre-filling with the default.
   /// Returns None if the user cancels the operation.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if the prompt fails for reasons other than user cancellation.
   pub fn prompt_number_with_default<T>(
     message: &str,
     default: T,
@@ -99,6 +123,10 @@ impl PromptUtils {
   ///
   /// Shows the provided message and a list of selectable options.
   /// Returns None if no options are available or if the user cancels.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if the prompt fails for reasons other than user cancellation.
   pub fn select_from_list<T: std::fmt::Display>(
     message: &str,
     options: Vec<T>,
