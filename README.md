@@ -27,7 +27,7 @@ A modern CLI tool for managing EXIF data in JPEG, TIFF, DNG, and RAW image files
 - 📁 **Recursive Processing**: Process subdirectories with user confirmation (defaults to yes)
 - 🔍 **Fuzzy Search**: Type to filter in all selection menus
 - 📝 **Smart Path Handling**: Supports paths with spaces, quoted paths, and escaped spaces
-- 💾 **Local Storage**: Equipment data stored in `~/.config/ifex.json` (Linux/Windows) or `~/Library/Application Support/ifex.json` (macOS)
+- 💾 **Local Storage**: Equipment data stored in `~/.config/ifex.json`
 - 🔄 **Interactive Interface**: Easy-to-use menu system with enhanced UX
 - ✅ **Batch Processing**: Process entire folders at once with detailed reporting
 - 🛡️ **Robust Error Handling**: Graceful fallbacks and clear error messages

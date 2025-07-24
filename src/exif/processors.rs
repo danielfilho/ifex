@@ -531,7 +531,7 @@ impl JpegProcessor {
   /// Note: This is a simplified implementation that preserves only ASCII string fields.
   /// More complex EXIF fields are not currently preserved to avoid data corruption.
   fn create_merged_exif_segment_with_iso(selection: &Selection, shot_iso: Option<u32>, existing_exif: Option<&exif::Exif>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    use exif::{Tag, Value};
+    use exif::Value;
     
     let mut segment = Vec::new();
     segment.extend_from_slice(b"\xff\xe1");
@@ -543,8 +543,16 @@ impl JpegProcessor {
     let ifd_offset = 8u32;
     data.extend_from_slice(&ifd_offset.to_le_bytes());
 
-    // Define the tags we want to update/override
-    let our_tags = [Tag::Make, Tag::Model, Tag::Artist, Tag::LensMake, Tag::LensModel, Tag::PhotographicSensitivity, Tag::FocalLength];
+    // Define the tags we want to update/override - using numeric IDs for more reliable matching
+    let our_tag_numbers = [
+      0x010f, // Make
+      0x0110, // Model  
+      0x013b, // Artist
+      0xa433, // LensMake
+      0xa434, // LensModel
+      0x8827, // PhotographicSensitivity (ISO)
+      0x920a, // FocalLength
+    ];
 
     // Collect preserved fields from existing EXIF
     let mut preserved_fields = Vec::new();
@@ -552,9 +560,14 @@ impl JpegProcessor {
     // Add existing fields that we're not overriding (preserve ALL field types now)
     if let Some(exif) = existing_exif {
       for field in exif.fields() {
+        // Get the numeric tag ID for comparison
+        let tag_number = Self::tag_to_number(&field.tag);
+        
         // Only skip the specific fields we're overriding, preserve everything else
-        if our_tags.contains(&field.tag) {
-          continue;
+        if let Some(tag_num) = tag_number {
+          if our_tag_numbers.contains(&tag_num) {
+            continue;
+          }
         }
 
         // Preserve ALL field types, not just ASCII strings
