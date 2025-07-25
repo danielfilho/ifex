@@ -1,4 +1,5 @@
 //! IFEX CLI application entry point
+#![allow(clippy::multiple_crate_versions)]
 
 use colored::Colorize;
 use ifex::{
@@ -9,14 +10,13 @@ use ifex::{
 use std::process;
 
 /// Main application entry point
-#[tokio::main]
-async fn main() {
+fn main() {
   let cli = Cli::parse_args();
 
   let result = match &cli.command {
-    Some(Commands::Manage) => run_management().await,
-    Some(Commands::Check { file } | Commands::Read { file }) => check_exif_data(file).await,
-    Some(Commands::Run) | None => run_interactive().await,
+    Some(Commands::Manage) => run_management(),
+    Some(Commands::Check { file } | Commands::Read { file }) => check_exif_data(file),
+    Some(Commands::Run) | None => run_interactive(),
   };
 
   if let Err(e) = result {
@@ -26,25 +26,26 @@ async fn main() {
 }
 
 /// Run the interactive main menu interface
-async fn run_interactive() -> Result<()> {
+fn run_interactive() -> Result<()> {
   println!("{}", "🏷️  IFEX - EXIF Data Manager\n".blue());
 
   let mut interface = Interface::new()?;
-  interface.run_main_menu().await?;
+  interface.run_main_menu()?;
   Ok(())
 }
 
 /// Run the equipment management interface
-async fn run_management() -> Result<()> {
+fn run_management() -> Result<()> {
   println!("{}", "🏷️  IFEX - Equipment Manager\n".blue());
 
   let mut interface = Interface::new()?;
-  interface.run_management_menu().await?;
+  interface.run_management_menu()?;
   Ok(())
 }
 
 /// Check and display EXIF data from an image file
-async fn check_exif_data(file: &std::path::Path) -> Result<()> {
+#[allow(clippy::unnecessary_wraps)]
+fn check_exif_data(file: &std::path::Path) -> Result<()> {
   use ifex::{prompts::PromptUtils, ExifManager};
 
   println!(

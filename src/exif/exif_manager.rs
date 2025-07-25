@@ -60,14 +60,15 @@ pub struct FileResult {
 pub struct ExifManager;
 
 impl Default for ExifManager {
-    fn default() -> Self {
-        Self::new()
-    }
+  fn default() -> Self {
+    Self::new()
+  }
 }
 
 impl ExifManager {
   /// Creates a new `ExifManager` instance.
-  #[must_use] pub const fn new() -> Self {
+  #[must_use]
+  pub const fn new() -> Self {
     Self
   }
 
@@ -78,7 +79,8 @@ impl ExifManager {
   /// For "apply" operations, a Selection containing equipment information is required.
   ///
   /// Returns a `ProcessingResult` with statistics and detailed results for each file.
-  #[must_use] pub fn process_folder(
+  #[must_use]
+  pub fn process_folder(
     &self,
     folder_path: &Path,
     selection: Option<&Selection>,
@@ -92,7 +94,8 @@ impl ExifManager {
   ///
   /// Supports custom ISO for push/pull processing. If `shot_iso` is None, uses film's base ISO.
   /// Returns a `ProcessingResult` with statistics and detailed results for each file.
-  #[must_use] pub fn process_folder_with_iso(
+  #[must_use]
+  pub fn process_folder_with_iso(
     &self,
     folder_path: &Path,
     selection: Option<&Selection>,

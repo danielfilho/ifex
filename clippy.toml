@@ -10,3 +10,7 @@ pass-by-value-size-limit = 256
 too-many-lines-threshold = 100
 avoid-breaking-exported-api = true
 suppress-restriction-lint-in-const = false
+
+# Disable problematic lints for CI
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true

@@ -4,7 +4,12 @@
 //! interactively apply or erase EXIF data from images, as well as manage
 //! their photography equipment database through various menu systems.
 
-use crate::{data::DataManager, models::{Selection, Setup, Film, Photographer, Camera, Lens}, prompts::PromptUtils, utils::clean_path};
+use crate::{
+  data::DataManager,
+  models::{Camera, Film, Lens, Photographer, Selection, Setup},
+  prompts::PromptUtils,
+  utils::clean_path,
+};
 use colored::Colorize;
 use std::path::PathBuf;
 
@@ -32,7 +37,7 @@ impl Interface {
   /// Displays the primary menu with options to apply EXIF data, erase EXIF data,
   /// manage equipment, or exit the application. Continues running until the user
   /// chooses to exit or cancels the operation.
-  pub async fn run_main_menu(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  pub fn run_main_menu(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     loop {
       let options = vec![
         "Apply EXIF data to images",
@@ -44,17 +49,17 @@ impl Interface {
       if let Some(choice) = PromptUtils::select_from_list("What would you like to do?", options)? {
         match choice {
           "Apply EXIF data to images" => {
-            if let Err(e) = self.handle_apply_exif().await {
+            if let Err(e) = self.handle_apply_exif() {
               eprintln!("{}", format!("Error: {e}").red());
             }
           }
           "Erase EXIF data from images" => {
-            if let Err(e) = self.handle_erase_exif().await {
+            if let Err(e) = self.handle_erase_exif() {
               eprintln!("{}", format!("Error: {e}").red());
             }
           }
           "Manage equipment" => {
-            if let Err(e) = self.run_management_menu().await {
+            if let Err(e) = self.run_management_menu() {
               eprintln!("{}", format!("Error: {e}").red());
             }
           }
@@ -75,8 +80,8 @@ impl Interface {
   ///
   /// Guides the user through selecting equipment, choosing a folder path,
   /// and applying EXIF metadata to supported image files in the specified location.
-  async fn handle_apply_exif(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-    let (selection, shot_iso) = self.select_setup_film_and_iso().await?;
+  fn handle_apply_exif(&self) -> Result<(), Box<dyn std::error::Error>> {
+    let (selection, shot_iso) = self.select_setup_film_and_iso()?;
     if selection.is_none() || shot_iso.is_none() {
       println!(
         "{}",
@@ -104,14 +109,13 @@ impl Interface {
     println!("{}", "\n📝 Applying EXIF data...\n".blue());
 
     let exif_manager = crate::ExifManager::new();
-    let result = exif_manager
-      .process_folder_with_iso(
-        &_folder_path,
-        Some(&selection),
-        "apply",
-        _recursive,
-        Some(shot_iso),
-      );
+    let result = exif_manager.process_folder_with_iso(
+      &_folder_path,
+      Some(&selection),
+      "apply",
+      _recursive,
+      Some(shot_iso),
+    );
 
     if result.success {
       println!(
@@ -161,7 +165,7 @@ impl Interface {
   ///
   /// Guides the user through selecting a folder path and confirmation,
   /// then erases EXIF metadata from supported image files in the specified location.
-  async fn handle_erase_exif(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  fn handle_erase_exif(&self) -> Result<(), Box<dyn std::error::Error>> {
     let folder_path = self.prompt_folder_path()?;
     if folder_path.is_none() {
       return Ok(());
@@ -183,8 +187,7 @@ impl Interface {
     println!("{}", "\n🗑️  Erasing EXIF data...\n".blue());
 
     let exif_manager = crate::ExifManager::new();
-    let result = exif_manager
-      .process_folder(&_folder_path, None, "erase", _recursive);
+    let result = exif_manager.process_folder(&_folder_path, None, "erase", _recursive);
 
     if result.success {
       println!(
@@ -235,7 +238,7 @@ impl Interface {
   /// Prompts the user to select a setup (camera + lens), film, photographer, and ISO,
   /// then creates a Selection object containing all the necessary information
   /// for EXIF metadata application.
-  async fn select_setup_film_and_iso(
+  fn select_setup_film_and_iso(
     &self,
   ) -> Result<(Option<Selection>, Option<u32>), Box<dyn std::error::Error>> {
     let setups = self.data_manager.get_setups();
@@ -294,8 +297,10 @@ impl Interface {
     }
     let shot_iso = shot_iso.unwrap();
 
-    let photographer_options: Vec<String> =
-      photographers.iter().map(Photographer::display_name).collect();
+    let photographer_options: Vec<String> = photographers
+      .iter()
+      .map(Photographer::display_name)
+      .collect();
     let selected_photographer_name =
       PromptUtils::select_from_list("Select a photographer:", photographer_options)?;
     if selected_photographer_name.is_none() {
@@ -326,9 +331,7 @@ impl Interface {
   fn prompt_shot_iso(&self, default_iso: u32) -> Result<Option<u32>, Box<dyn std::error::Error>> {
     println!("{}", format!("📸 Film base ISO: {default_iso}").cyan());
 
-    let prompt_text = format!(
-      "Enter the ISO speed you shot at (press Enter for {default_iso}): "
-    );
+    let prompt_text = format!("Enter the ISO speed you shot at (press Enter for {default_iso}): ");
 
     if let Some(input) = PromptUtils::prompt_text(&prompt_text)? {
       if input.trim().is_empty() {
@@ -389,7 +392,7 @@ impl Interface {
   /// # Errors
   ///
   /// Returns an error if there are issues with user prompts or data management operations.
-  pub async fn run_management_menu(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  pub fn run_management_menu(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     loop {
       let options = vec![
         "Manage Cameras",
@@ -402,11 +405,11 @@ impl Interface {
 
       if let Some(choice) = PromptUtils::select_from_list("Equipment Management", options)? {
         match choice {
-          "Manage Cameras" => self.manage_cameras().await?,
-          "Manage Lenses" => self.manage_lenses().await?,
-          "Manage Films" => self.manage_films().await?,
-          "Manage Photographers" => self.manage_photographers().await?,
-          "Manage Setups" => self.manage_setups().await?,
+          "Manage Cameras" => self.manage_cameras()?,
+          "Manage Lenses" => self.manage_lenses()?,
+          "Manage Films" => self.manage_films()?,
+          "Manage Photographers" => self.manage_photographers()?,
+          "Manage Setups" => self.manage_setups()?,
           "Back to main menu" => break,
           _ => {}
         }
@@ -421,7 +424,7 @@ impl Interface {
   ///
   /// Provides options to view, add, and delete cameras in the configuration.
   /// Prevents deletion of cameras that are currently used in setups.
-  async fn manage_cameras(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  fn manage_cameras(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "\n📷 Camera Management\n".blue().bold());
 
     loop {
@@ -524,7 +527,7 @@ impl Interface {
   ///
   /// Provides options to view, add, and delete lenses in the configuration.
   /// Prevents deletion of lenses that are currently used in setups.
-  async fn manage_lenses(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  fn manage_lenses(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "\n🔍 Lens Management\n".blue().bold());
 
     loop {
@@ -654,7 +657,7 @@ impl Interface {
   ///
   /// Provides options to view, add, and delete film stocks in the configuration.
   /// Films can be deleted without restriction as they are not referenced by other entities.
-  async fn manage_films(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  fn manage_films(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "\n🎞️ Film Management\n".blue().bold());
 
     loop {
@@ -753,7 +756,7 @@ impl Interface {
   ///
   /// Provides options to view, add, and delete photographers in the configuration.
   /// Photographers can be deleted without restriction as they are not referenced by other entities.
-  async fn manage_photographers(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  fn manage_photographers(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "\n👤 Photographer Management\n".blue().bold());
 
     loop {
@@ -800,8 +803,10 @@ impl Interface {
             if photographers.is_empty() {
               println!("{}", "No photographers to edit.".yellow());
             } else {
-              let photographer_options: Vec<String> =
-                photographers.iter().map(Photographer::display_name).collect();
+              let photographer_options: Vec<String> = photographers
+                .iter()
+                .map(Photographer::display_name)
+                .collect();
               if let Some(selected_name) =
                 PromptUtils::select_from_list("Select photographer to edit:", photographer_options)?
               {
@@ -827,10 +832,7 @@ impl Interface {
                       .edit_photographer(photographer.id, name, email)
                     {
                       self.data_manager.save()?;
-                      println!(
-                        "{}",
-                        format!("✅ Updated photographer: {old_name}").green()
-                      );
+                      println!("{}", format!("✅ Updated photographer: {old_name}").green());
                     } else {
                       println!("{}", "❌ Failed to update photographer.".red());
                     }
@@ -844,8 +846,10 @@ impl Interface {
             if photographers.is_empty() {
               println!("{}", "No photographers to delete.".yellow());
             } else {
-              let photographer_options: Vec<String> =
-                photographers.iter().map(Photographer::display_name).collect();
+              let photographer_options: Vec<String> = photographers
+                .iter()
+                .map(Photographer::display_name)
+                .collect();
               if let Some(selected_name) = PromptUtils::select_from_list(
                 "Select photographer to delete:",
                 photographer_options,
@@ -880,7 +884,7 @@ impl Interface {
   ///
   /// Provides options to view, add, and delete equipment setups (camera + lens combinations).
   /// Validates that referenced cameras and lenses exist before creating new setups.
-  async fn manage_setups(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+  fn manage_setups(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "\n⚙️ Setup Management\n".blue().bold());
 
     loop {
