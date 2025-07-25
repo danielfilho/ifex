@@ -1,0 +1,93 @@
+[package]
+name = "ifex"
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.70"
+description = "A modern CLI tool for managing EXIF data in JPEG, TIFF, DNG and RAW image files with structured equipment management"
+authors = ["Daniel Filho <tag-rut-untracked@duck.com>"]
+license = "MIT"
+repository = "https://github.com/danielfilho/ifex"
+homepage = "https://github.com/danielfilho/ifex#readme"
+readme = "README.md"
+keywords = ["exif", "jpeg", "tiff", "dng", "raw", "photography", "cli", "metadata"]
+categories = ["command-line-utilities", "multimedia::images"]
+
+[[bin]]
+name = "ifex"
+path = "src/main.rs"
+
+[dependencies]
+# CLI framework
+clap = { version = "4.5", features = ["derive", "color"] }
+
+# Interactive prompts
+inquire = "0.7"
+
+# Terminal colors and styling
+colored = "2.1"
+
+# File and path utilities
+walkdir = "2.5"
+
+# JSON serialization for config
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# UUID generation
+uuid = { version = "1.10", features = ["v4", "serde"] }
+
+# Date/time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# EXIF processing
+kamadak-exif = "0.6"
+image = "0.25"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Cross-platform directories
+dirs = "5.0"
+
+# XML processing for XMP sidecars
+quick-xml = { version = "0.36", features = ["serialize"] }
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+[dev-dependencies]
+tempfile = "3.8"
+assert_cmd = "2.0"
+predicates = "3.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+overflow-checks = true
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unused_extern_crates = "warn"
+unused_import_braces = "warn"
+unused_qualifications = "warn"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn" 
+cargo = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+unreachable = "warn"
