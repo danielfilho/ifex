@@ -7,19 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.100.0] - 2025-07-25
 
-### 🎯 Version Milestone Release
-
-This release marks a significant milestone in IFEX development, representing the maturity and stability of the Rust rewrite. The version jump from 0.10.0 to 0.100.0 reflects the substantial improvements and production-ready quality of the codebase.
-
-#### 🚀 Highlights
-- **Production Ready**: Stable API and feature set
-- **Performance Optimized**: Zero-cost abstractions and efficient memory usage
-- **Comprehensive Testing**: 45+ tests ensuring reliability
-- **Cross-Platform**: Native binaries for all major platforms
-
-## [0.10.0] - 2025-07-25
-
-### 🚀 Major Release: Complete Rust Rewrite
+### 🎯 Complete Rust Rewrite
 
 This version represents a complete rewrite of IFEX from JavaScript/Node.js to Rust, bringing significant performance improvements, enhanced reliability, and better error handling.
 
