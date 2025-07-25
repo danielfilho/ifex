@@ -61,7 +61,7 @@ export PATH="$PATH:/path/to/ifex"
 ### Homebrew (macOS/Linux)
 
 ```bash
-# Install directly from this repository's tap
+# Install directly from the tap
 brew install danielfilho/ifex/ifex
 
 # Or tap first, then install
