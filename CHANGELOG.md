@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2025-07-25
+
+### 🚀 Major Release: Complete Rust Rewrite
+
+This version represents a complete rewrite of IFEX from JavaScript/Node.js to Rust, bringing significant performance improvements, enhanced reliability, and better error handling.
+
+#### ⚡ Performance & Reliability
+- **Complete Rust rewrite**: From JavaScript/Node.js to Rust for maximum performance and memory safety
+- **Native binary**: Single executable with no runtime dependencies
+- **Cross-platform support**: Windows, macOS (Intel & Apple Silicon), and Linux binaries
+- **Memory safety**: Zero-cost abstractions with compile-time guarantees
+
+#### 🛠️ Core Features
+- **Multi-format EXIF support**: JPEG, TIFF, DNG, and 20+ RAW camera formats
+- **Equipment management**: Complete database for cameras, lenses, films, photographers, and setups
+- **Interactive CLI**: Modern terminal interface with colored output and intuitive navigation
+- **Batch processing**: Recursive directory scanning with progress feedback
+- **ISO override**: Support for push/pull processing with custom ISO values
+
+#### 🔧 Technical Improvements
+- **Robust error handling**: Comprehensive error reporting with detailed feedback
+- **Type safety**: Strong typing throughout the application prevents runtime errors
+- **Modular architecture**: Clean separation of concerns with well-defined modules
+- **Comprehensive testing**: 45+ unit and integration tests ensuring reliability
+- **CI/CD pipeline**: Automated testing, formatting, and linting with GitHub Actions
+
+#### 🎨 User Experience
+- **Colored output**: Enhanced readability with syntax highlighting
+- **Progress indicators**: Real-time feedback during batch operations
+- **Clear navigation**: Intuitive menu system with easy-to-understand options
+- **Flexible input**: Support for quoted paths, spaces, and various path formats
+
+#### 📦 Development Quality
+- **Clippy compliance**: Strict linting rules ensure code quality
+- **Formatted code**: Consistent formatting with rustfmt
+- **Documentation**: Comprehensive inline documentation and README
+- **Security**: Forbids unsafe code and follows Rust security best practices
+
+### Breaking Changes
+- **Complete API rewrite**: This is not compatible with previous JavaScript versions
+- **Configuration format**: New JSON-based configuration system
+- **Command-line interface**: Updated CLI structure and options
+
+### Migration
+Users upgrading from previous versions will need to reconfigure their equipment database, as the underlying data format has changed to support the new Rust implementation.
+
 ## [0.3.0] - 2025-07-20
 
 ### Added
