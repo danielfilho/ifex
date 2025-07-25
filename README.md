@@ -6,7 +6,7 @@
 
 A modern CLI tool for managing EXIF data in JPEG, TIFF, DNG, and RAW image files with structured equipment management. Built with Rust for performance and reliability.
 
-> **📢 Version 0.10.0**: Complete rewrite in Rust! This major version brings significant performance improvements, enhanced reliability, and better cross-platform support. See [CHANGELOG.md](CHANGELOG.md) for migration details.
+> **📢 Version 0.100.0**: Production-ready milestone! This release represents the maturity and stability of the Rust rewrite, with comprehensive testing and cross-platform support. Install via Homebrew or download from [releases](https://github.com/danielfilho/ifex/releases).
 
 ## Features
 
@@ -56,6 +56,17 @@ sudo mv ifex-* /usr/local/bin/ifex
 
 # Or add to your PATH
 export PATH="$PATH:/path/to/ifex"
+```
+
+### Homebrew (macOS/Linux)
+
+```bash
+# Install directly from this repository's tap
+brew install danielfilho/ifex/ifex
+
+# Or tap first, then install
+brew tap danielfilho/ifex
+brew install ifex
 ```
 
 ### From Source
