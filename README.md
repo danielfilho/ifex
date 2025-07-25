@@ -1,6 +1,10 @@
 # IFEX - EXIF Data Manager
 
-A modern CLI tool for managing EXIF data in JPEG, TIFF, DNG, and RAW image files with structured equipment management.
+[![CI](https://github.com/danielfilho/ifex/actions/workflows/ci.yml/badge.svg)](https://github.com/danielfilho/ifex/actions/workflows/ci.yml)
+[![Release](https://github.com/danielfilho/ifex/actions/workflows/release.yml/badge.svg)](https://github.com/danielfilho/ifex/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+A modern CLI tool for managing EXIF data in JPEG, TIFF, DNG, and RAW image files with structured equipment management. Built with Rust for performance and reliability.
 
 ## Features
 
@@ -28,89 +32,85 @@ A modern CLI tool for managing EXIF data in JPEG, TIFF, DNG, and RAW image files
 - ✅ **Batch Processing**: Process entire folders at once with detailed reporting
 - 🛡️ **Robust Error Handling**: Graceful fallbacks and clear error messages
 - 🔍 **EXIF Inspection**: View EXIF data from image files in formatted tables
+- ⚡ **Performance**: Built with Rust for fast, reliable processing
 
 ## Installation
 
-### Global Installation (Recommended)
+### From GitHub Releases (Recommended)
+
+Download the latest binary for your platform from [GitHub Releases](https://github.com/danielfilho/ifex/releases):
+
+- **Linux x86_64**: `ifex-linux-x86_64`
+- **macOS Intel**: `ifex-macos-x86_64` 
+- **macOS Apple Silicon**: `ifex-macos-aarch64`
+- **Windows**: `ifex-windows-x86_64.exe`
+
+Make the binary executable and move it to your PATH:
 
 ```bash
-npm install -g ifex-cli
+# Linux/macOS
+chmod +x ifex-*
+sudo mv ifex-* /usr/local/bin/ifex
+
+# Or add to your PATH
+export PATH="$PATH:/path/to/ifex"
 ```
 
-After installation, you can use `ifex` command from anywhere:
+### From Source
+
+Requires [Rust](https://rustup.rs/) 1.70 or later:
 
 ```bash
-ifex
+git clone https://github.com/danielfilho/ifex.git
+cd ifex
+cargo install --path .
 ```
 
-### Local Development
+### Development Setup
 
-1. Clone this repository
-2. Install dependencies:
-
-   ```bash
-   npm install
-   ```
+```bash
+git clone https://github.com/danielfilho/ifex.git
+cd ifex
+cargo build --release
+```
 
 ## Usage
 
 ### Interactive Mode (Default)
 
-**Global Installation:**
-
 ```bash
 ifex
 ```
 
-**Local Development:**
-
-```bash
-npm start
-# or
-node src/index.js
-```
-
 ### Equipment Management Only
-
-**Global Installation:**
 
 ```bash
 ifex manage
 ```
 
-**Local Development:**
+### EXIF Inspection
 
 ```bash
-npm start manage
+ifex check /path/to/image.jpg
 ```
 
 ### Available Commands
 
-**Global Installation:**
-
 - `ifex` - Run interactive mode with all options
 - `ifex manage` - Equipment management only
-- `ifex run` - Explicit interactive mode
+- `ifex run` - Explicit interactive mode (same as default)
 - `ifex check <file>` - Display EXIF data from an image file
-
-**Local Development:**
-
-- `npm start` - Run interactive mode with all options
-- `npm start manage` - Equipment management only
-- `npm start run` - Explicit interactive mode
-- `npm start check <file>` - Display EXIF data from an image file
+- `ifex read <file>` - Read and display EXIF data from an image file
 
 ## Equipment Management
 
-The tool stores equipment data in `~/.config/ifex.json` with separate collections for:
+The tool stores equipment data in a JSON file with separate collections for:
 
 ### Cameras
-
 - Maker (e.g., "Canon", "Nikon")
 - Model (e.g., "AE-1", "FM2")
 
 ### Lenses
-
 - Maker (e.g., "Canon", "Nikon")
 - Model (e.g., "FD", "AI")
 - Focal Length (e.g., "50", "28-135") - in mm
@@ -118,18 +118,15 @@ The tool stores equipment data in `~/.config/ifex.json` with separate collection
 - Mount (e.g., "FD", "F", "K")
 
 ### Films
-
 - Maker (e.g., "Kodak", "Fuji")
 - Name (e.g., "Portra 400", "Velvia 50")
 - ISO rating
 
 ### Photographers
-
 - Name (e.g., "John Doe", "Jane Smith")
-- Email (optional, e.g., "<john@photography.com>")
+- Email (optional, e.g., "john@photography.com")
 
 ### Setups
-
 - Name (e.g., "Street Photography", "Studio Portraits")
 - Camera reference
 - Lens reference
@@ -198,35 +195,69 @@ IFEX intelligently handles various path formats:
 - Quoted paths: `"/Users/user/My Photos"`
 - Escaped paths: `/Users/user/My\ Photos`
 
-## Architecture
+## Development
 
-IFEX uses a modular architecture with separated concerns for better maintainability and testing:
-
-- **EXIF Manager** (`src/exif/exifManager.js`) - Main orchestrator
-- **File Type Detection** (`src/exif/fileTypes.js`) - File format identification
-- **EXIF Tags** (`src/exif/tags.js`) - Tag definitions and utilities
-- **Format Processors** - Specialized handlers for different formats:
-  - JPEG Processor (`src/exif/jpegProcessor.js`)
-  - TIFF Processor (`src/exif/tiffProcessor.js`)
-  - RAW Processor (`src/exif/rawProcessor.js`)
-- **Sidecar Processor** (`src/exif/sidecarProcessor.js`) - XMP sidecar file generation
-- **File Collector** (`src/exif/fileCollector.js`) - Recursive file discovery
-
-## Testing
-
-Run the comprehensive test suite:
+### Building
 
 ```bash
-npm test
+cargo build --release
 ```
 
-Tests cover all modules including file types, EXIF tags, processors, and integration scenarios.
+### Testing
+
+```bash
+cargo test
+```
+
+### Linting
+
+```bash
+cargo clippy
+cargo fmt --check
+```
+
+### Running Development Version
+
+```bash
+cargo run
+cargo run -- manage
+cargo run -- check /path/to/image.jpg
+cargo run -- read /path/to/image.jpg
+```
+
+## Architecture
+
+IFEX uses a modular Rust architecture with separated concerns:
+
+- **CLI Module** (`src/cli.rs`) - Command-line argument parsing
+- **Interface Module** (`src/interface.rs`) - Interactive menu system
+- **Data Manager** (`src/data.rs`) - Equipment CRUD operations
+- **Models** (`src/models.rs`) - Data structures with serialization
+- **EXIF Manager** (`src/exif/exif_manager.rs`) - Main orchestrator
+- **File Type Detection** (`src/exif/file_types.rs`) - Format identification
+- **EXIF Tags** (`src/exif/tags.rs`) - Tag definitions and utilities
+- **Format Processors** (`src/exif/processors.rs`) - Specialized handlers
+- **Prompts** (`src/prompts.rs`) - Interactive user input utilities
+- **Utils** (`src/utils.rs`) - Path handling and file utilities
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `cargo test`
+5. Run linting: `cargo clippy && cargo fmt`
+6. Submit a pull request
 
 ## Requirements
 
-- Node.js 18.0.0 or higher
+- Rust 1.70.0 or higher (for building from source)
 - Supported image file formats (see above)
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history and changes.

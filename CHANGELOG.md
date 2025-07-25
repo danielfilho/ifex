@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.0] - 2025-07-20
 
 ### Added
+
 - 🎯 **Multi-Format Support**: Extended beyond JPEG to support TIFF, DNG, and RAW files
   - JPEG/JPG: Direct EXIF modification (existing functionality)
   - TIFF/TIF: Direct EXIF modification using UTIF library
@@ -31,12 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Graceful degradation for problematic files
 
 ### Improved
+
 - **Case-Insensitive File Extension Detection**: More robust file type detection using `path.basename()` and `lastIndexOf()`
 - **Enhanced File Type Detection**: Support for 25+ RAW camera formats
 - **Better User Experience**: Updated prompts from "JPEG files" to "image files" to reflect multi-format support
 - **Comprehensive Testing**: All 71 tests passing with enhanced coverage
 
 ### Technical
+
 - Added `exifr` library for RAW file metadata reading
 - Added `utif` library for TIFF/DNG processing
 - Added `fuzzy` and `inquirer-autocomplete-prompt` for search functionality
@@ -45,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed unused dependencies and imports
 
 ### Dependencies
+
 - Added: `exifr@^7.1.3` for RAW file support
 - Added: `utif@^3.1.0` for TIFF/DNG processing
 - Added: `fuzzy@^0.1.3` for search functionality
