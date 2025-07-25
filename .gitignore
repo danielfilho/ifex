@@ -115,3 +115,6 @@ eslint.config.js
 *.pid
 *.seed
 *.pid.lock
+
+# Claude configuration
+.claude/
