@@ -24,11 +24,6 @@ pub enum Commands {
   Run,
   /// Manage cameras, lenses, films, and setups
   Manage,
-  /// Display EXIF data from an image file in a formatted table
-  Check {
-    /// Path to the image file
-    file: PathBuf,
-  },
   /// Read and display EXIF data from an image file in a formatted table
   Read {
     /// Path to the image file

@@ -104,7 +104,7 @@ ifex manage
 ### EXIF Inspection
 
 ```bash
-ifex check /path/to/image.jpg
+ifex read /path/to/image.jpg
 ```
 
 ### Available Commands
@@ -112,7 +112,6 @@ ifex check /path/to/image.jpg
 - `ifex` - Run interactive mode with all options
 - `ifex manage` - Equipment management only
 - `ifex run` - Explicit interactive mode (same as default)
-- `ifex check <file>` - Display EXIF data from an image file
 - `ifex read <file>` - Read and display EXIF data from an image file
 
 ## Equipment Management
@@ -154,10 +153,10 @@ The tool stores equipment data in a JSON file with separate collections for:
 
 ### EXIF Inspection
 
-Use the check command to view EXIF data from any supported image file:
+Use the read command to view EXIF data from any supported image file:
 
 ```bash
-ifex check /path/to/image.jpg
+ifex read /path/to/image.jpg
 ```
 
 This displays a formatted table with all EXIF fields including camera, lens, and film information.
@@ -234,7 +233,6 @@ cargo fmt --check
 ```bash
 cargo run
 cargo run -- manage
-cargo run -- check /path/to/image.jpg
 cargo run -- read /path/to/image.jpg
 ```
 
