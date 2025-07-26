@@ -118,3 +118,4 @@ eslint.config.js
 
 # Claude configuration
 .claude/
+CLAUDE.local.md
