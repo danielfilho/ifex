@@ -15,7 +15,7 @@ fn main() {
 
   let result = match &cli.command {
     Some(Commands::Manage) => run_management(),
-    Some(Commands::Check { file } | Commands::Read { file }) => check_exif_data(file),
+    Some(Commands::Read { file }) => check_exif_data(file),
     Some(Commands::Run) | None => run_interactive(),
   };
 
