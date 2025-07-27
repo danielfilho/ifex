@@ -141,14 +141,14 @@ The tool stores equipment data in a JSON file with separate collections for:
 ### Setups
 - Name (e.g., "Street Photography", "Studio Portraits")
 - Camera reference
-- Lens reference
+- Lens reference (optional - supports camera-only setups)
 
 ## Workflow
 
 ### EXIF Application
 
 1. **Manage Equipment**: Add cameras, lenses, films, and photographers
-2. **Create Setups**: Combine cameras with lenses
+2. **Create Setups**: Combine cameras with optional lenses (supports camera-only setups)
 3. **Apply EXIF**: Select setup + film + photographer for batch processing
 
 ### EXIF Inspection

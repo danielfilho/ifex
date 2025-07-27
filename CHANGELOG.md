@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.101.0] - 2025-07-27
+
+### ✨ New Features
+- **Optional lens support**: Equipment setups now support camera-only configurations
+  - Create setups with just a camera (no lens required)
+  - Option to select "No lens (camera only)" when creating or editing setups
+  - EXIF metadata gracefully handles missing lens information
+  - XMP sidecar files properly exclude lens data when not available
+
+### 🔧 Improvements
+- Enhanced setup management UI with clearer lens selection options
+- Better visual indication for camera-only setups in setup listings
+- Improved error handling for equipment validation
+
+### 🏗️ Technical Changes
+- Updated data models to support optional lens references
+- Modified EXIF processors to conditionally include lens metadata
+- Enhanced selection display to show "None (camera only)" for setups without lenses
+- Updated all tests to work with optional lens structure
+
 ## [0.100.0] - 2025-07-25
 
 ### 🎯 Complete Rust Rewrite
