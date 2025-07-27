@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Better visual indication for camera-only setups in setup listings
 - Improved error handling for equipment validation
 
+### 📚 Documentation
+- Added Homebrew upgrade instructions for easier package management
+
+### 🐛 Bug Fixes
+- Removed duplicate option for reading EXIF metadata
+
 ### 🏗️ Technical Changes
 - Updated data models to support optional lens references
 - Modified EXIF processors to conditionally include lens metadata
