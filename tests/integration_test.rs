@@ -22,7 +22,7 @@ fn test_full_workflow_config_and_models() {
     "Jane Smith".to_string(),
     Some("jane@example.com".to_string()),
   );
-  let setup = Setup::new("Portrait Setup".to_string(), camera.id, lens.id);
+  let setup = Setup::new("Portrait Setup".to_string(), camera.id, Some(lens.id));
 
   // Create config
   let mut config = Config::default();
@@ -54,7 +54,7 @@ fn test_full_workflow_config_and_models() {
   assert_eq!(loaded_camera.display_name(), "Canon EOS R5");
   assert_eq!(loaded_lens.display_name(), "Canon EF 85mm 85mm f/1.2");
   assert_eq!(loaded_setup.camera_id, loaded_camera.id);
-  assert_eq!(loaded_setup.lens_id, loaded_lens.id);
+  assert_eq!(loaded_setup.lens_id, Some(loaded_lens.id));
 }
 
 #[test]
@@ -69,19 +69,19 @@ fn test_selection_workflow() {
   );
   let film = Film::new("Kodak".to_string(), "Portra 400".to_string(), 400);
   let photographer = Photographer::new("Test User".to_string(), None);
-  let setup = Setup::new("Wedding Setup".to_string(), camera.id, lens.id);
+  let setup = Setup::new("Wedding Setup".to_string(), camera.id, Some(lens.id));
 
   let selection = Selection {
     setup,
     camera,
-    lens,
+    lens: Some(lens),
     film,
     photographer,
   };
 
   assert_eq!(selection.camera.display_name(), "Nikon D850");
   assert_eq!(
-    selection.lens.display_name(),
+    selection.lens.as_ref().unwrap().display_name(),
     "Nikon AF-S 24-70mm 24-70mm f/2.8"
   );
   assert_eq!(selection.film.display_name(), "Kodak Portra 400 (ISO 400)");

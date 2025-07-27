@@ -25,16 +25,15 @@ impl ExifTags {
 
     exif_data.insert("Make".to_string(), selection.camera.maker.clone());
     exif_data.insert("Model".to_string(), selection.camera.model.clone());
-    exif_data.insert("LensMake".to_string(), selection.lens.maker.clone());
-    exif_data.insert(
-      "LensModel".to_string(),
-      selection.lens.lens_model_with_aperture(),
-    );
-    exif_data.insert(
-      "FocalLength".to_string(),
-      selection.lens.focal_length.clone(),
-    );
-    exif_data.insert("FNumber".to_string(), selection.lens.aperture.clone());
+
+    // Only add lens data if a lens is present
+    if let Some(lens) = &selection.lens {
+      exif_data.insert("LensMake".to_string(), lens.maker.clone());
+      exif_data.insert("LensModel".to_string(), lens.lens_model_with_aperture());
+      exif_data.insert("FocalLength".to_string(), lens.focal_length.clone());
+      exif_data.insert("FNumber".to_string(), lens.aperture.clone());
+    }
+
     exif_data.insert(
       "ISOSpeedRatings".to_string(),
       selection.film.iso.to_string(),
@@ -60,16 +59,14 @@ impl ExifTags {
 
     exif_data.insert("Make".to_string(), selection.camera.maker.clone());
     exif_data.insert("Model".to_string(), selection.camera.model.clone());
-    exif_data.insert("LensMake".to_string(), selection.lens.maker.clone());
-    exif_data.insert(
-      "LensModel".to_string(),
-      selection.lens.lens_model_with_aperture(),
-    );
-    exif_data.insert(
-      "FocalLength".to_string(),
-      selection.lens.focal_length.clone(),
-    );
-    exif_data.insert("FNumber".to_string(), selection.lens.aperture.clone());
+
+    // Only add lens data if a lens is present
+    if let Some(lens) = &selection.lens {
+      exif_data.insert("LensMake".to_string(), lens.maker.clone());
+      exif_data.insert("LensModel".to_string(), lens.lens_model_with_aperture());
+      exif_data.insert("FocalLength".to_string(), lens.focal_length.clone());
+      exif_data.insert("FNumber".to_string(), lens.aperture.clone());
+    }
 
     // ISOSpeedRatings always uses the film's base ISO rating
     exif_data.insert(
@@ -96,10 +93,16 @@ impl ExifTags {
     match tag {
       "Make" => Some(selection.camera.maker.clone()),
       "Model" => Some(selection.camera.model.clone()),
-      "LensMake" => Some(selection.lens.maker.clone()),
-      "LensModel" => Some(selection.lens.lens_model_with_aperture()),
-      "FocalLength" => Some(selection.lens.focal_length.clone()),
-      "FNumber" => Some(selection.lens.aperture.clone()),
+      "LensMake" => selection.lens.as_ref().map(|lens| lens.maker.clone()),
+      "LensModel" => selection
+        .lens
+        .as_ref()
+        .map(super::super::models::Lens::lens_model_with_aperture),
+      "FocalLength" => selection
+        .lens
+        .as_ref()
+        .map(|lens| lens.focal_length.clone()),
+      "FNumber" => selection.lens.as_ref().map(|lens| lens.aperture.clone()),
       "ISOSpeedRatings" | "ISOSpeed" => Some(selection.film.iso.to_string()),
       "Artist" => Some(selection.photographer.name.clone()),
       _ => None,
@@ -119,10 +122,16 @@ impl ExifTags {
     match tag {
       "Make" => Some(selection.camera.maker.clone()),
       "Model" => Some(selection.camera.model.clone()),
-      "LensMake" => Some(selection.lens.maker.clone()),
-      "LensModel" => Some(selection.lens.lens_model_with_aperture()),
-      "FocalLength" => Some(selection.lens.focal_length.clone()),
-      "FNumber" => Some(selection.lens.aperture.clone()),
+      "LensMake" => selection.lens.as_ref().map(|lens| lens.maker.clone()),
+      "LensModel" => selection
+        .lens
+        .as_ref()
+        .map(super::super::models::Lens::lens_model_with_aperture),
+      "FocalLength" => selection
+        .lens
+        .as_ref()
+        .map(|lens| lens.focal_length.clone()),
+      "FNumber" => selection.lens.as_ref().map(|lens| lens.aperture.clone()),
       "ISOSpeedRatings" | "ISOSpeed" => {
         let iso_value = shot_iso.unwrap_or(selection.film.iso);
         Some(iso_value.to_string())
@@ -142,6 +151,19 @@ impl ExifTags {
   /// namespaces for TIFF, EXIF, Dublin Core, and auxiliary data.
   #[must_use]
   pub fn create_xmp_metadata(selection: &Selection) -> String {
+    let lens_metadata = if let Some(lens) = &selection.lens {
+      format!(
+        r"      <aux:LensModel>{}</aux:LensModel>
+      <exif:FocalLength>{}</exif:FocalLength>
+      <exif:FNumber>{}</exif:FNumber>",
+        lens.lens_model_with_aperture(),
+        lens.focal_length,
+        lens.aperture
+      )
+    } else {
+      String::new()
+    };
+
     format!(
       r#"<?xml version="1.0" encoding="UTF-8"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core">
@@ -153,9 +175,7 @@ impl ExifTags {
         xmlns:aux="http://ns.adobe.com/exif/1.0/aux/">
       <tiff:Make>{}</tiff:Make>
       <tiff:Model>{}</tiff:Model>
-      <aux:LensModel>{}</aux:LensModel>
-      <exif:FocalLength>{}</exif:FocalLength>
-      <exif:FNumber>{}</exif:FNumber>
+{}
       <exif:ISOSpeedRatings>
         <rdf:Bag>
           <rdf:li>{}</rdf:li>
@@ -171,9 +191,7 @@ impl ExifTags {
 </x:xmpmeta>"#,
       selection.camera.maker,
       selection.camera.model,
-      selection.lens.lens_model_with_aperture(),
-      selection.lens.focal_length,
-      selection.lens.aperture,
+      lens_metadata,
       selection.film.iso,
       selection.photographer.name
     )
@@ -186,6 +204,19 @@ impl ExifTags {
   #[must_use]
   pub fn create_xmp_metadata_with_iso(selection: &Selection, shot_iso: Option<u32>) -> String {
     let iso_value = shot_iso.unwrap_or(selection.film.iso);
+    let lens_metadata = if let Some(lens) = &selection.lens {
+      format!(
+        r"      <aux:LensModel>{}</aux:LensModel>
+      <exif:FocalLength>{}</exif:FocalLength>
+      <exif:FNumber>{}</exif:FNumber>",
+        lens.lens_model_with_aperture(),
+        lens.focal_length,
+        lens.aperture
+      )
+    } else {
+      String::new()
+    };
+
     format!(
       r#"<?xml version="1.0" encoding="UTF-8"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core">
@@ -197,9 +228,7 @@ impl ExifTags {
         xmlns:aux="http://ns.adobe.com/exif/1.0/aux/">
       <tiff:Make>{}</tiff:Make>
       <tiff:Model>{}</tiff:Model>
-      <aux:LensModel>{}</aux:LensModel>
-      <exif:FocalLength>{}</exif:FocalLength>
-      <exif:FNumber>{}</exif:FNumber>
+{}
       <exif:ISOSpeedRatings>
         <rdf:Bag>
           <rdf:li>{}</rdf:li>
@@ -215,9 +244,7 @@ impl ExifTags {
 </x:xmpmeta>"#,
       selection.camera.maker,
       selection.camera.model,
-      selection.lens.lens_model_with_aperture(),
-      selection.lens.focal_length,
-      selection.lens.aperture,
+      lens_metadata,
       iso_value,
       selection.photographer.name
     )

@@ -195,7 +195,7 @@ impl Photographer {
   }
 }
 
-/// Equipment setup combining a camera and lens
+/// Equipment setup combining a camera and optionally a lens
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Setup {
   /// Unique identifier for the setup
@@ -205,9 +205,9 @@ pub struct Setup {
   /// Reference to the camera used in this setup
   #[serde(rename = "cameraId")]
   pub camera_id: Uuid,
-  /// Reference to the lens used in this setup
+  /// Optional reference to the lens used in this setup
   #[serde(rename = "lensId")]
-  pub lens_id: Uuid,
+  pub lens_id: Option<Uuid>,
   /// Timestamp when the setup was created
   #[serde(rename = "createdAt")]
   pub created_at: DateTime<Utc>,
@@ -217,8 +217,9 @@ impl Setup {
   /// Creates a new equipment setup with the specified name and equipment IDs.
   ///
   /// Automatically generates a unique ID and sets the creation timestamp.
+  /// The lens is optional and can be None for camera-only setups.
   #[must_use]
-  pub fn new(name: String, camera_id: Uuid, lens_id: Uuid) -> Self {
+  pub fn new(name: String, camera_id: Uuid, lens_id: Option<Uuid>) -> Self {
     Self {
       id: Uuid::new_v4(),
       name,
@@ -241,15 +242,15 @@ impl Setup {
 ///
 /// This struct combines all the necessary equipment and photographer information
 /// needed to apply comprehensive EXIF metadata to images. It includes the setup
-/// (camera + lens combination), film stock, and photographer details.
+/// (camera + optional lens combination), film stock, and photographer details.
 #[derive(Debug, Clone)]
 pub struct Selection {
-  /// The equipment setup (camera + lens combination)
+  /// The equipment setup (camera + optional lens combination)
   pub setup: Setup,
   /// The camera used for the photographs
   pub camera: Camera,
-  /// The lens used for the photographs
-  pub lens: Lens,
+  /// The lens used for the photographs (optional for camera-only setups)
+  pub lens: Option<Lens>,
   /// The film stock used for the photographs
   pub film: Film,
   /// The photographer who took the photographs

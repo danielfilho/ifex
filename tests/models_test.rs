@@ -110,11 +110,11 @@ fn test_photographer_display_name_without_email() {
 fn test_setup_new() {
   let camera_id = Uuid::new_v4();
   let lens_id = Uuid::new_v4();
-  let setup = Setup::new("My Setup".to_string(), camera_id, lens_id);
+  let setup = Setup::new("My Setup".to_string(), camera_id, Some(lens_id));
 
   assert_eq!(setup.name, "My Setup");
   assert_eq!(setup.camera_id, camera_id);
-  assert_eq!(setup.lens_id, lens_id);
+  assert_eq!(setup.lens_id, Some(lens_id));
   assert!(!setup.id.is_nil());
 }
 
@@ -122,6 +122,6 @@ fn test_setup_new() {
 fn test_setup_display_name() {
   let camera_id = Uuid::new_v4();
   let lens_id = Uuid::new_v4();
-  let setup = Setup::new("My Setup".to_string(), camera_id, lens_id);
+  let setup = Setup::new("My Setup".to_string(), camera_id, Some(lens_id));
   assert_eq!(setup.display_name(), "My Setup");
 }

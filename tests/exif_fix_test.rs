@@ -41,12 +41,12 @@ fn test_exif_apply_and_read_with_focal_length() {
   );
   let film = Film::new("Test".to_string(), "Film".to_string(), 400);
   let photographer = Photographer::new("Test User".to_string(), None);
-  let setup = Setup::new("Test Setup".to_string(), camera.id, lens.id);
+  let setup = Setup::new("Test Setup".to_string(), camera.id, Some(lens.id));
 
   let selection = Selection {
     setup,
     camera,
-    lens,
+    lens: Some(lens),
     film,
     photographer,
   };
@@ -123,12 +123,12 @@ fn test_exif_apply_and_read_without_focal_length() {
   );
   let film = Film::new("Test".to_string(), "Film".to_string(), 200);
   let photographer = Photographer::new("Test User".to_string(), None);
-  let setup = Setup::new("Test Setup".to_string(), camera.id, lens.id);
+  let setup = Setup::new("Test Setup".to_string(), camera.id, Some(lens.id));
 
   let selection = Selection {
     setup,
     camera,
-    lens,
+    lens: Some(lens),
     film,
     photographer,
   };

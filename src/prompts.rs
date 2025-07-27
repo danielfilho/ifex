@@ -148,7 +148,11 @@ impl PromptUtils {
     println!("\n{}", "📋 Selected Configuration:".blue().bold());
     println!("  {} {}", "Setup:".cyan(), selection.setup.display_name());
     println!("  {} {}", "Camera:".cyan(), selection.camera.display_name());
-    println!("  {} {}", "Lens:".cyan(), selection.lens.display_name());
+    if let Some(lens) = &selection.lens {
+      println!("  {} {}", "Lens:".cyan(), lens.display_name());
+    } else {
+      println!("  {} {}", "Lens:".cyan(), "None (camera only)".italic());
+    }
     println!("  {} {}", "Film:".cyan(), selection.film.display_name());
     println!(
       "  {} {}",

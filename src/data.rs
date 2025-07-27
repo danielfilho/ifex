@@ -83,19 +83,22 @@ impl DataManager {
 
   /// Adds a new equipment setup to the configuration.
   ///
-  /// Creates a new setup that combines a camera and lens. Returns an error
-  /// if either the camera or lens ID cannot be found in the configuration.
+  /// Creates a new setup that combines a camera and optionally a lens. Returns an error
+  /// if the camera ID cannot be found in the configuration, or if a lens ID is provided
+  /// but cannot be found.
   pub fn add_setup(
     &mut self,
     name: String,
     camera_id: Uuid,
-    lens_id: Uuid,
+    lens_id: Option<Uuid>,
   ) -> Result<Setup, String> {
     if !self.config.cameras.iter().any(|c| c.id == camera_id) {
       return Err("Camera not found".to_string());
     }
-    if !self.config.lenses.iter().any(|l| l.id == lens_id) {
-      return Err("Lens not found".to_string());
+    if let Some(lens_id) = lens_id {
+      if !self.config.lenses.iter().any(|l| l.id == lens_id) {
+        return Err("Lens not found".to_string());
+      }
     }
 
     let setup = Setup::new(name, camera_id, lens_id);
@@ -175,7 +178,7 @@ impl DataManager {
 
   /// Creates a complete equipment selection for EXIF metadata application.
   ///
-  /// Combines a setup (camera + lens), film, and photographer into a single
+  /// Combines a setup (camera + optional lens), film, and photographer into a single
   /// Selection object that contains all necessary information for applying
   /// EXIF metadata to images. Returns an error if any of the specified IDs
   /// cannot be found in the configuration.
@@ -189,7 +192,16 @@ impl DataManager {
     let camera = self
       .get_camera_by_id(setup.camera_id)
       .ok_or("Camera not found")?;
-    let lens = self.get_lens_by_id(setup.lens_id).ok_or("Lens not found")?;
+    let lens = if let Some(lens_id) = setup.lens_id {
+      Some(
+        self
+          .get_lens_by_id(lens_id)
+          .ok_or("Lens not found")?
+          .clone(),
+      )
+    } else {
+      None
+    };
     let film = self.get_film_by_id(film_id).ok_or("Film not found")?;
     let photographer = self
       .get_photographer_by_id(photographer_id)
@@ -198,7 +210,7 @@ impl DataManager {
     Ok(Selection {
       setup: setup.clone(),
       camera: camera.clone(),
-      lens: lens.clone(),
+      lens,
       film: film.clone(),
       photographer: photographer.clone(),
     })
@@ -223,7 +235,7 @@ impl DataManager {
   /// This prevents data integrity issues by ensuring referenced lenses
   /// are not deleted.
   pub fn delete_lens(&mut self, id: Uuid) -> Result<(), String> {
-    if self.config.setups.iter().any(|s| s.lens_id == id) {
+    if self.config.setups.iter().any(|s| s.lens_id == Some(id)) {
       return Err("Cannot delete lens that is used in setups".to_string());
     }
     self.config.lenses.retain(|l| l.id != id);
@@ -326,14 +338,17 @@ impl DataManager {
     id: Uuid,
     name: String,
     camera_id: Uuid,
-    lens_id: Uuid,
+    lens_id: Option<Uuid>,
   ) -> Result<bool, String> {
-    // Validate that the referenced camera and lens exist
+    // Validate that the referenced camera exists
     if self.get_camera_by_id(camera_id).is_none() {
       return Err("Camera not found".to_string());
     }
-    if self.get_lens_by_id(lens_id).is_none() {
-      return Err("Lens not found".to_string());
+    // Validate that the lens exists if one is provided
+    if let Some(lens_id) = lens_id {
+      if self.get_lens_by_id(lens_id).is_none() {
+        return Err("Lens not found".to_string());
+      }
     }
 
     if let Some(setup) = self.config.setups.iter_mut().find(|s| s.id == id) {

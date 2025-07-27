@@ -702,19 +702,33 @@ impl JpegProcessor {
     // Collect all string fields (our new ones + preserved ones)
     let mut all_string_fields = Vec::new();
 
+    // Pre-compute lens model to avoid lifetime issues
+    let lens_model_string = selection
+      .lens
+      .as_ref()
+      .map(super::super::models::Lens::complete_lens_model);
+
     // Add our fields (these override existing ones)
     all_string_fields.push((0x010f, selection.camera.maker.as_str())); // Make
     all_string_fields.push((0x0110, selection.camera.model.as_str())); // Model
     all_string_fields.push((0x013b, selection.photographer.name.as_str())); // Artist
-    all_string_fields.push((0xa433, selection.lens.maker.as_str())); // Lens Make
-    let lens_model_complete = selection.lens.complete_lens_model();
-    all_string_fields.push((0xa434, lens_model_complete.as_str())); // Lens Model
+
+    // Add lens fields only if a lens is present
+    if let Some(lens) = &selection.lens {
+      all_string_fields.push((0xa433, lens.maker.as_str())); // Lens Make
+      if let Some(ref lens_model) = lens_model_string {
+        all_string_fields.push((0xa434, lens_model.as_str())); // Lens Model
+      }
+    }
 
     // Add ISO field
     let iso_value = shot_iso.unwrap_or(selection.film.iso);
 
-    // Add focal length if parseable
-    let focal_length_entry = selection.lens.focal_length.parse::<f32>().is_ok();
+    // Add focal length if parseable and lens is present
+    let focal_length_entry = selection
+      .lens
+      .as_ref()
+      .is_some_and(|lens| lens.focal_length.parse::<f32>().is_ok());
 
     // Calculate entry count
     let entry_count =
@@ -793,19 +807,21 @@ impl JpegProcessor {
     iso_entry.extend_from_slice(&[0x00, 0x00]); // padding
     data.extend_from_slice(&iso_entry);
 
-    // Add focal length if parseable
-    if let Ok(focal_length) = selection.lens.focal_length.parse::<f32>() {
-      let focal_length_rational = (focal_length * 1000.0).abs() as u32;
-      let mut focal_entry = Vec::new();
-      focal_entry.extend_from_slice(&(0x920Au16).to_le_bytes()); // Focal length tag
-      focal_entry.extend_from_slice(&[0x05, 0x00]); // RATIONAL type
-      focal_entry.extend_from_slice(&1u32.to_le_bytes()); // count = 1
-      focal_entry.extend_from_slice(&u32::try_from(string_offset).unwrap_or(0).to_le_bytes()); // offset to rational data
-      data.extend_from_slice(&focal_entry);
+    // Add focal length if lens is present and parseable
+    if let Some(lens) = &selection.lens {
+      if let Ok(focal_length) = lens.focal_length.parse::<f32>() {
+        let focal_length_rational = (focal_length * 1000.0).abs() as u32;
+        let mut focal_entry = Vec::new();
+        focal_entry.extend_from_slice(&(0x920Au16).to_le_bytes()); // Focal length tag
+        focal_entry.extend_from_slice(&[0x05, 0x00]); // RATIONAL type
+        focal_entry.extend_from_slice(&1u32.to_le_bytes()); // count = 1
+        focal_entry.extend_from_slice(&u32::try_from(string_offset).unwrap_or(0).to_le_bytes()); // offset to rational data
+        data.extend_from_slice(&focal_entry);
 
-      // Add rational data at the end (numerator/denominator)
-      string_data.extend_from_slice(&focal_length_rational.to_le_bytes());
-      string_data.extend_from_slice(&1000u32.to_le_bytes());
+        // Add rational data at the end (numerator/denominator)
+        string_data.extend_from_slice(&focal_length_rational.to_le_bytes());
+        string_data.extend_from_slice(&1000u32.to_le_bytes());
+      }
     }
 
     // Next IFD pointer (0 = no more IFDs)

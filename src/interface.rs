@@ -905,16 +905,19 @@ impl Interface {
             } else {
               println!("{}", "⚙️ Setups:".cyan().bold());
               for setup in setups {
-                if let (Some(camera), Some(lens)) = (
-                  self.data_manager.get_camera_by_id(setup.camera_id),
-                  self.data_manager.get_lens_by_id(setup.lens_id),
-                ) {
-                  println!(
-                    "  • {} ({} + {})",
-                    setup.display_name(),
-                    camera.display_name(),
-                    lens.display_name()
-                  );
+                if let Some(camera) = self.data_manager.get_camera_by_id(setup.camera_id) {
+                  if let Some(lens_id) = setup.lens_id {
+                    if let Some(lens) = self.data_manager.get_lens_by_id(lens_id) {
+                      println!(
+                        "  • {} ({} + {})",
+                        setup.display_name(),
+                        camera.display_name(),
+                        lens.display_name()
+                      );
+                    }
+                  } else {
+                    println!("  • {} ({})", setup.display_name(), camera.display_name());
+                  }
                 }
               }
             }
@@ -930,13 +933,6 @@ impl Interface {
               );
               continue;
             }
-            if lenses.is_empty() {
-              println!(
-                "{}",
-                "No lenses available. Please add lenses first.".yellow()
-              );
-              continue;
-            }
 
             if let Some(name) = PromptUtils::prompt_text("Setup name:")? {
               let camera_options: Vec<String> = cameras.iter().map(Camera::display_name).collect();
@@ -948,29 +944,47 @@ impl Interface {
                   .find(|c| c.display_name() == selected_camera_name)
                   .expect("Selected camera should exist");
 
-                let lens_options: Vec<String> = lenses.iter().map(Lens::display_name).collect();
-                if let Some(selected_lens_name) =
-                  PromptUtils::select_from_list("Select lens:", lens_options)?
-                {
-                  let selected_lens = lenses
-                    .iter()
-                    .find(|l| l.display_name() == selected_lens_name)
-                    .expect("Selected lens should exist");
+                let selected_lens_id = if lenses.is_empty() {
+                  println!(
+                    "{}",
+                    "No lenses available. Creating camera-only setup.".yellow()
+                  );
+                  None
+                } else {
+                  let mut lens_options: Vec<String> =
+                    lenses.iter().map(Lens::display_name).collect();
+                  lens_options.insert(0, "No lens (camera only)".to_string());
 
-                  match self
-                    .data_manager
-                    .add_setup(name, selected_camera.id, selected_lens.id)
+                  if let Some(selected_lens_name) =
+                    PromptUtils::select_from_list("Select lens (optional):", lens_options)?
                   {
-                    Ok(setup) => {
-                      self.data_manager.save()?;
-                      println!(
-                        "{}",
-                        format!("✅ Added setup: {}", setup.display_name()).green()
-                      );
+                    if selected_lens_name == "No lens (camera only)" {
+                      None
+                    } else {
+                      let selected_lens = lenses
+                        .iter()
+                        .find(|l| l.display_name() == selected_lens_name)
+                        .expect("Selected lens should exist");
+                      Some(selected_lens.id)
                     }
-                    Err(e) => {
-                      println!("{}", format!("❌ Error: {e}").red());
-                    }
+                  } else {
+                    None
+                  }
+                };
+
+                match self
+                  .data_manager
+                  .add_setup(name, selected_camera.id, selected_lens_id)
+                {
+                  Ok(setup) => {
+                    self.data_manager.save()?;
+                    println!(
+                      "{}",
+                      format!("✅ Added setup: {}", setup.display_name()).green()
+                    );
+                  }
+                  Err(e) => {
+                    println!("{}", format!("❌ Error: {e}").red());
                   }
                 }
               }
@@ -998,13 +1012,6 @@ impl Interface {
                     );
                     continue;
                   }
-                  if lenses.is_empty() {
-                    println!(
-                      "{}",
-                      "No lenses available. Please add lenses first.".yellow()
-                    );
-                    continue;
-                  }
 
                   if let Some(name) =
                     PromptUtils::prompt_text_with_default("Setup name:", &setup.name)?
@@ -1019,32 +1026,49 @@ impl Interface {
                         .find(|c| c.display_name() == selected_camera_name)
                         .expect("Selected camera should exist");
 
-                      let lens_options: Vec<String> =
-                        lenses.iter().map(Lens::display_name).collect();
-                      if let Some(selected_lens_name) =
-                        PromptUtils::select_from_list("Select lens:", lens_options)?
-                      {
-                        let selected_lens = lenses
-                          .iter()
-                          .find(|l| l.display_name() == selected_lens_name)
-                          .expect("Selected lens should exist");
+                      let selected_lens_id = if lenses.is_empty() {
+                        println!(
+                          "{}",
+                          "No lenses available. Keeping camera-only setup.".yellow()
+                        );
+                        None
+                      } else {
+                        let mut lens_options: Vec<String> =
+                          lenses.iter().map(Lens::display_name).collect();
+                        lens_options.insert(0, "No lens (camera only)".to_string());
 
-                        match self.data_manager.edit_setup(
-                          setup.id,
-                          name,
-                          selected_camera.id,
-                          selected_lens.id,
-                        ) {
-                          Ok(true) => {
-                            self.data_manager.save()?;
-                            println!("{}", format!("✅ Updated setup: {old_name}").green());
+                        if let Some(selected_lens_name) =
+                          PromptUtils::select_from_list("Select lens (optional):", lens_options)?
+                        {
+                          if selected_lens_name == "No lens (camera only)" {
+                            None
+                          } else {
+                            let selected_lens = lenses
+                              .iter()
+                              .find(|l| l.display_name() == selected_lens_name)
+                              .expect("Selected lens should exist");
+                            Some(selected_lens.id)
                           }
-                          Ok(false) => {
-                            println!("{}", "❌ Failed to update setup.".red());
-                          }
-                          Err(e) => {
-                            println!("{}", format!("❌ Error: {e}").red());
-                          }
+                        } else {
+                          None
+                        }
+                      };
+
+                      match self.data_manager.edit_setup(
+                        setup.id,
+                        name,
+                        selected_camera.id,
+                        selected_lens_id,
+                      ) {
+                        Ok(true) => {
+                          self.data_manager.save()?;
+                          println!("{}", format!("✅ Updated setup: {old_name}").green());
+                        }
+                        Ok(false) => {
+                          println!("{}", "❌ Failed to update setup.".red());
+                        }
+                        Err(e) => {
+                          println!("{}", format!("❌ Error: {e}").red());
                         }
                       }
                     }
