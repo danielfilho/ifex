@@ -67,6 +67,9 @@ brew install danielfilho/ifex/ifex
 # Or tap first, then install
 brew tap danielfilho/ifex
 brew install ifex
+
+# Upgrade to the latest version
+brew upgrade danielfilho/ifex/ifex
 ```
 
 ### From Source
