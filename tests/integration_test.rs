@@ -1,3 +1,5 @@
+//! Integration tests for the ifex library workflows.
+
 use ifex::config::Config;
 use ifex::models::*;
 use std::fs;

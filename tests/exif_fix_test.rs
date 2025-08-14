@@ -1,3 +1,5 @@
+//! Tests for EXIF processing functionality.
+
 use ifex::exif::processors::JpegProcessor;
 use ifex::models::*;
 use std::fs;

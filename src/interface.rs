@@ -106,14 +106,21 @@ impl Interface {
     }
     let _recursive = recursive.unwrap();
 
+    // New file selection interface
+    let selected_files = PromptUtils::select_files_from_folder(&_folder_path, _recursive)?;
+    if selected_files.is_none() {
+      println!("{}", "No files selected. Returning to main menu.".yellow());
+      return Ok(());
+    }
+    let selected_files = selected_files.unwrap();
+
     println!("{}", "\n📝 Applying EXIF data...\n".blue());
 
     let exif_manager = crate::ExifManager::new();
-    let result = exif_manager.process_folder_with_iso(
-      &_folder_path,
+    let result = exif_manager.process_selected_files(
+      &selected_files,
       Some(&selection),
       "apply",
-      _recursive,
       Some(shot_iso),
     );
 
@@ -354,10 +361,11 @@ impl Interface {
 
   /// Prompts the user to enter a folder path for image processing.
   ///
+  /// Provides path autocompletion with tab completion and tilde expansion.
   /// Cleans the input path by removing quotes and handling escaped spaces.
   /// Returns None if the user cancels the operation.
   fn prompt_folder_path(&self) -> Result<Option<PathBuf>, Box<dyn std::error::Error>> {
-    if let Some(path_str) = PromptUtils::prompt_text("Enter the folder path:")? {
+    if let Some(path_str) = PromptUtils::prompt_path("Enter the folder path:")? {
       let cleaned_path = clean_path(&path_str);
       Ok(Some(PathBuf::from(cleaned_path)))
     } else {

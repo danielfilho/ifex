@@ -1,3 +1,5 @@
+//! Tests for data models and their functionality.
+
 use ifex::models::*;
 use uuid::Uuid;
 

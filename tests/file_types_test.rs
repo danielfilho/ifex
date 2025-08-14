@@ -1,3 +1,5 @@
+//! Tests for file type detection and handling.
+
 use ifex::exif::file_types::FileType;
 use std::path::Path;
 

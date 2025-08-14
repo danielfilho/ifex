@@ -29,6 +29,8 @@ pub mod config;
 pub mod data;
 /// EXIF processing and manipulation module
 pub mod exif;
+/// Interactive file selection module
+pub mod file_selector;
 /// Interactive user interface module
 pub mod interface;
 /// Data model definitions module

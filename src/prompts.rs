@@ -4,9 +4,208 @@
 //! interactive prompts, as well as formatting functions for displaying
 //! information in a user-friendly manner.
 
-use crate::models::Selection;
+use crate::{file_selector::FileSelector, models::Selection};
 use colored::Colorize;
-use inquire::{Confirm, CustomType, InquireError, Select, Text};
+use inquire::{autocompletion::Autocomplete, Confirm, CustomType, InquireError, MultiSelect, Select, Text};
+use std::{
+  fs,
+  path::{Path, PathBuf},
+  sync::{Arc, Mutex},
+  time::{SystemTime, UNIX_EPOCH},
+};
+
+/// Path autocompleter for file system paths.
+///
+/// Implements the Autocomplete trait to provide tab completion for folder paths,
+/// supporting tilde expansion and directory traversal.
+/// On double tab, displays a file/folder listing.
+#[derive(Clone)]
+struct PathAutocompleter {
+  last_input: Arc<Mutex<String>>,
+  last_tab_time: Arc<Mutex<u64>>,
+}
+
+impl PathAutocompleter {
+  fn new() -> Self {
+    Self {
+      last_input: Arc::new(Mutex::new(String::new())),
+      last_tab_time: Arc::new(Mutex::new(0)),
+    }
+  }
+  
+  fn get_current_time() -> u64 {
+    SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap_or_default()
+      .as_millis() as u64
+  }
+  
+  fn is_double_tab(&self, input: &str) -> bool {
+    let now = Self::get_current_time();
+    let mut last_input = self.last_input.lock().unwrap();
+    let mut last_time = self.last_tab_time.lock().unwrap();
+    
+    let is_double = input == *last_input && now - *last_time < 500; // 500ms threshold
+    
+    *last_input = input.to_string();
+    *last_time = now;
+    
+    is_double
+  }
+  
+  fn show_directory_listing(&self, input: &str) {
+    let expanded_input = if input.starts_with('~') {
+      if let Some(home) = dirs::home_dir() {
+        input.replacen('~', &home.to_string_lossy(), 1)
+      } else {
+        input.to_string()
+      }
+    } else {
+      input.to_string()
+    };
+
+    let path = Path::new(&expanded_input);
+    let dir_to_list = if expanded_input.is_empty() {
+      Path::new(".")
+    } else if expanded_input.ends_with('/') || expanded_input.ends_with('\\') {
+      path
+    } else if let Some(parent) = path.parent() {
+      parent
+    } else {
+      Path::new(".")
+    };
+
+    println!("\n{}", format!("📂 Contents of {} (continue typing or press Tab to autocomplete):", dir_to_list.display()).cyan().bold());
+    
+    if let Ok(entries) = fs::read_dir(dir_to_list) {
+      let mut files = Vec::new();
+      let mut dirs = Vec::new();
+      
+      for entry in entries.flatten() {
+        let file_name = entry.file_name().to_string_lossy().to_string();
+        
+        // Skip hidden files/directories unless input starts with .
+        if file_name.starts_with('.') && !expanded_input.ends_with("/.") && !expanded_input.contains("/.") {
+          continue;
+        }
+        
+        if entry.path().is_dir() {
+          dirs.push(format!("{}/", file_name));
+        } else {
+          files.push(file_name);
+        }
+      }
+      
+      // Sort directories and files separately
+      dirs.sort();
+      files.sort();
+      
+      // Check if both are empty before iterating
+      let is_empty = dirs.is_empty() && files.is_empty();
+      
+      if !is_empty {
+        // Display in a more compact format - show first 10 items
+        let total_items = dirs.len() + files.len();
+        let mut displayed = 0;
+        const MAX_DISPLAY: usize = 10;
+        
+        // Display directories first
+        for dir in &dirs {
+          if displayed < MAX_DISPLAY {
+            println!("  {} {}", "📁".blue(), dir.blue());
+            displayed += 1;
+          } else {
+            break;
+          }
+        }
+        
+        // Then display files
+        for file in &files {
+          if displayed < MAX_DISPLAY {
+            println!("  {} {}", "📄".white(), file);
+            displayed += 1;
+          } else {
+            break;
+          }
+        }
+        
+        if total_items > MAX_DISPLAY {
+          println!("  {} {}", "...".yellow(), format!("and {} more items", total_items - MAX_DISPLAY).yellow());
+        }
+      } else {
+        println!("  {}", "Empty directory".yellow().italic());
+      }
+    } else {
+      println!("  {}", "Cannot read directory".red());
+    }
+    
+    println!(); // Empty line for better readability
+  }
+}
+
+impl Autocomplete for PathAutocompleter {
+  fn get_suggestions(&mut self, input: &str) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
+    // Check for double tab and show directory listing
+    if self.is_double_tab(input) {
+      self.show_directory_listing(input);
+      // Return empty suggestions so the input stays the same
+      return Ok(vec![]);
+    }
+    
+    let suggestions = PromptUtils::internal_path_autocompleter(input);
+    Ok(suggestions)
+  }
+
+  fn get_completion(&mut self, input: &str, highlighted_suggestion: Option<String>) -> Result<inquire::autocompletion::Replacement, Box<dyn std::error::Error + Send + Sync>> {
+    match highlighted_suggestion {
+      Some(suggestion) => {
+        Ok(inquire::autocompletion::Replacement::Some(suggestion))
+      }
+      None => {
+        // If there's no highlighted suggestion, try to find a common prefix
+        let suggestions = PromptUtils::internal_path_autocompleter(input);
+        if suggestions.len() == 1 {
+          // If there's exactly one suggestion, use it
+          Ok(inquire::autocompletion::Replacement::Some(suggestions[0].clone()))
+        } else if suggestions.len() > 1 {
+          // If there are multiple suggestions, find common prefix
+          let common_prefix = find_common_prefix(&suggestions);
+          if common_prefix.len() > input.len() {
+            Ok(inquire::autocompletion::Replacement::Some(common_prefix))
+          } else {
+            Ok(inquire::autocompletion::Replacement::None)
+          }
+        } else {
+          Ok(inquire::autocompletion::Replacement::None)
+        }
+      }
+    }
+  }
+}
+
+/// Find the longest common prefix among a list of strings
+fn find_common_prefix(strings: &[String]) -> String {
+  if strings.is_empty() {
+    return String::new();
+  }
+  
+  if strings.len() == 1 {
+    return strings[0].clone();
+  }
+  
+  let mut prefix = String::new();
+  let first = &strings[0];
+  
+  for (i, ch) in first.chars().enumerate() {
+    if strings.iter().all(|s| s.chars().nth(i) == Some(ch)) {
+      prefix.push(ch);
+    } else {
+      break;
+    }
+  }
+  
+  prefix
+}
 
 /// Utility struct providing static methods for user interaction and display formatting.
 ///
@@ -37,6 +236,125 @@ impl PromptUtils {
     }
   }
 
+  /// Path autocompletion function for folder paths.
+  ///
+  /// Provides tab completion for file system paths, supporting tilde expansion
+  /// and directory traversal. Returns suggestions for directories that match
+  /// the current input.
+  #[must_use]
+  pub fn path_autocompleter(input: &str) -> Vec<String> {
+    Self::internal_path_autocompleter(input)
+  }
+
+  /// Internal path autocompletion implementation.
+  fn internal_path_autocompleter(input: &str) -> Vec<String> {
+    let expanded_input = if input.starts_with('~') {
+      if let Some(home) = dirs::home_dir() {
+        input.replacen('~', &home.to_string_lossy(), 1)
+      } else {
+        input.to_string()
+      }
+    } else {
+      input.to_string()
+    };
+
+    let path = Path::new(&expanded_input);
+
+    // If the path ends with a separator or is empty, list contents of the directory
+    let (dir_to_search, prefix) = if expanded_input.is_empty() {
+      (Path::new("."), String::new())
+    } else if expanded_input.ends_with('/') || expanded_input.ends_with('\\') {
+      // When path ends with '/', list all contents of that directory
+      (path, String::new())
+    } else {
+      // Split into directory and file prefix for partial completion
+      if let Some(parent) = path.parent() {
+        let filename = path.file_name().unwrap_or_default().to_string_lossy();
+        (parent, filename.to_string())
+      } else {
+        (Path::new("."), expanded_input.clone())
+      }
+    };
+
+    let mut suggestions = Vec::new();
+
+    if let Ok(entries) = fs::read_dir(dir_to_search) {
+      for entry in entries.flatten() {
+        let file_name = entry.file_name().to_string_lossy().to_string();
+
+        // Skip hidden files/directories (starting with .)
+        if file_name.starts_with('.') && !prefix.starts_with('.') {
+          continue;
+        }
+
+        // Only suggest directories and files that match the prefix
+        if file_name.starts_with(&prefix) {
+          let full_path = entry.path();
+          
+          // Build the suggestion based on the original input context
+          let suggestion = if expanded_input.ends_with('/') || expanded_input.ends_with('\\') {
+            // When input ends with separator, append the filename to the input
+            if full_path.is_dir() {
+              format!("{}{}/", expanded_input, file_name)
+            } else {
+              format!("{}{}", expanded_input, file_name)
+            }
+          } else {
+            // When input doesn't end with separator, replace the last component
+            if let Some(parent) = Path::new(&expanded_input).parent() {
+              if parent.to_string_lossy().is_empty() || parent == Path::new(".") {
+                if full_path.is_dir() {
+                  format!("{}/", file_name)
+                } else {
+                  file_name.clone()
+                }
+              } else {
+                if full_path.is_dir() {
+                  format!("{}/{}/", parent.to_string_lossy(), file_name)
+                } else {
+                  format!("{}/{}", parent.to_string_lossy(), file_name)
+                }
+              }
+            } else {
+              if full_path.is_dir() {
+                format!("{}/", file_name)
+              } else {
+                file_name.clone()
+              }
+            }
+          };
+
+          // Convert back to use tilde if the original input started with ~
+          let final_suggestion = if input.starts_with('~') {
+            if let Some(home) = dirs::home_dir() {
+              suggestion.replace(&home.to_string_lossy().to_string(), "~")
+            } else {
+              suggestion
+            }
+          } else {
+            suggestion
+          };
+
+          suggestions.push(final_suggestion);
+        }
+      }
+    }
+
+    // Sort suggestions with directories first
+    suggestions.sort_by(|a, b| {
+      let a_is_dir = a.ends_with('/');
+      let b_is_dir = b.ends_with('/');
+      match (a_is_dir, b_is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.cmp(b),
+      }
+    });
+
+    // Limit to first 20 suggestions to avoid overwhelming the user
+    suggestions.into_iter().take(20).collect()
+  }
+
   /// Prompts the user for text input.
   ///
   /// Shows the provided message and waits for user input.
@@ -47,6 +365,23 @@ impl PromptUtils {
   /// Returns an error if the prompt fails for reasons other than user cancellation.
   pub fn prompt_text(message: &str) -> Result<Option<String>, Box<dyn std::error::Error>> {
     let result = Text::new(message).prompt();
+    Self::handle_cancellation(result)
+  }
+
+  /// Prompts the user for a file system path with autocompletion.
+  ///
+  /// Shows the provided message and waits for user input, providing tab completion
+  /// for file system paths. Supports tilde expansion (~) and shows directory suggestions.
+  /// Returns None if the user cancels the operation.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if the prompt fails for reasons other than user cancellation.
+  pub fn prompt_path(message: &str) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let result = Text::new(message)
+      .with_autocomplete(PathAutocompleter::new())
+      .with_help_message("Tab: autocomplete paths, /: show directory listing, ~ for home directory")
+      .prompt();
     Self::handle_cancellation(result)
   }
 
@@ -138,6 +473,89 @@ impl PromptUtils {
 
     let result = Select::new(message, options).prompt();
     Self::handle_cancellation(result)
+  }
+
+  /// Prompts the user to select files from a folder interactively.
+  ///
+  /// Scans the specified folder for supported image files and presents them
+  /// in an interactive multi-select interface. Users can navigate with arrow keys,
+  /// select/deselect files with spacebar, and confirm with Enter.
+  ///
+  /// # Arguments
+  ///
+  /// * `folder_path` - The directory to scan for image files
+  /// * `recursive` - Whether to scan subdirectories recursively
+  ///
+  /// # Returns
+  ///
+  /// A vector of selected file paths, or None if the user cancels or no files are available.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if the prompt fails for reasons other than user cancellation.
+  pub fn select_files_from_folder(
+    folder_path: &Path,
+    recursive: bool,
+  ) -> Result<Option<Vec<PathBuf>>, Box<dyn std::error::Error>> {
+    let files = FileSelector::scan_directory(folder_path, recursive);
+
+    if files.is_empty() {
+      println!(
+        "{}",
+        "No supported image files found in the specified folder.".yellow()
+      );
+      return Ok(None);
+    }
+
+    println!(
+      "{}",
+      format!(
+        "\n📂 Found {} supported image file{} in folder",
+        files.len(),
+        if files.len() == 1 { "" } else { "s" }
+      )
+      .blue()
+    );
+    println!(
+      "{}",
+      "Use arrow keys to navigate, spacebar to select/deselect, Enter to confirm:"
+        .cyan()
+    );
+
+    // Create display options with relative paths
+    let display_options: Vec<String> = files
+      .iter()
+      .map(|file_path| FileSelector::format_file_for_display(file_path, folder_path))
+      .collect();
+
+    let result = MultiSelect::new("Select files to apply EXIF data:", display_options).prompt();
+
+    match Self::handle_cancellation(result)? {
+      Some(selected_displays) => {
+        // Map selected display strings back to full paths
+        let selected_files: Vec<PathBuf> = selected_displays
+          .iter()
+          .filter_map(|display| {
+            files.iter().find(|file_path| {
+              FileSelector::format_file_for_display(file_path, folder_path) == *display
+            })
+          })
+          .cloned()
+          .collect();
+
+        if selected_files.is_empty() {
+          println!("{}", "No files selected.".yellow());
+          Ok(None)
+        } else {
+          println!(
+            "{}",
+            format!("✅ Selected {} file{} for processing", selected_files.len(), if selected_files.len() == 1 { "" } else { "s" }).green()
+          );
+          Ok(Some(selected_files))
+        }
+      }
+      None => Ok(None),
+    }
   }
 
   /// Displays a formatted equipment selection summary.

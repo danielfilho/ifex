@@ -1,3 +1,5 @@
+//! Tests for configuration management functionality.
+
 use ifex::config::Config;
 use ifex::models::*;
 use std::fs;

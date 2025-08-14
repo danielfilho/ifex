@@ -9,18 +9,32 @@ use std::path::Path;
 /// Cleans user-provided path input by removing quotes and handling escape sequences.
 ///
 /// Removes surrounding single or double quotes from the input string,
-/// and converts escaped spaces (backslash-space) to regular spaces.
+/// converts escaped spaces (backslash-space) to regular spaces, and
+/// expands tilde (~) to the user's home directory.
 /// This helps handle paths that users copy from file managers or shells.
 #[must_use]
 pub fn clean_path(input: &str) -> String {
   let trimmed = input.trim();
 
-  if (trimmed.starts_with('"') && trimmed.ends_with('"'))
+  let unquoted = if (trimmed.starts_with('"') && trimmed.ends_with('"'))
     || (trimmed.starts_with('\'') && trimmed.ends_with('\''))
   {
-    trimmed[1..trimmed.len() - 1].to_string()
+    &trimmed[1..trimmed.len() - 1]
   } else {
-    trimmed.replace("\\ ", " ")
+    trimmed
+  };
+
+  let unescaped = unquoted.replace("\\ ", " ");
+
+  // Handle tilde expansion
+  if unescaped.starts_with('~') {
+    if let Some(home) = dirs::home_dir() {
+      unescaped.replacen('~', &home.to_string_lossy(), 1)
+    } else {
+      unescaped
+    }
+  } else {
+    unescaped
   }
 }
 

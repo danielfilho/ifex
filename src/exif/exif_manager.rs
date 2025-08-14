@@ -6,7 +6,7 @@
 
 use crate::models::Selection;
 use crate::utils::{get_file_type, is_supported_image_format};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 /// Result of a batch EXIF processing operation.
@@ -173,6 +173,81 @@ impl ExifManager {
       ProcessingResult {
         success: false,
         message: "No supported image files found".to_string(),
+        results: stats,
+      }
+    }
+  }
+
+  /// Processes a specific list of selected files with optional custom shot ISO.
+  ///
+  /// Applies the requested operation ("apply" or "erase") to the provided list of files.
+  /// For "apply" operations, a Selection containing equipment information is required.
+  /// Supports custom ISO for push/pull processing.
+  ///
+  /// Returns a `ProcessingResult` with statistics and detailed results for each file.
+  #[must_use]
+  pub fn process_selected_files(
+    &self,
+    file_paths: &[PathBuf],
+    selection: Option<&Selection>,
+    operation: &str,
+    shot_iso: Option<u32>,
+  ) -> ProcessingResult {
+    let mut stats = ProcessingStats {
+      processed: 0,
+      failed: 0,
+      files: Vec::new(),
+    };
+
+    for file_path in file_paths {
+      if file_path.is_file() && is_supported_image_format(file_path) {
+        let file_name = file_path
+          .file_name()
+          .unwrap_or_default()
+          .to_string_lossy()
+          .to_string();
+
+        let file_type = get_file_type(file_path);
+
+        let result = match operation {
+          "apply" => self.apply_exif_with_iso(file_path, selection.unwrap(), shot_iso),
+          "erase" => self.erase_exif(file_path),
+          _ => Err("Unknown operation".into()),
+        };
+
+        match result {
+          Ok(()) => {
+            stats.processed += 1;
+            stats.files.push(FileResult {
+              name: file_name,
+              success: true,
+              file_type,
+              error: None,
+            });
+          }
+          Err(e) => {
+            stats.failed += 1;
+            stats.files.push(FileResult {
+              name: file_name,
+              success: false,
+              file_type,
+              error: Some(e.to_string()),
+            });
+          }
+        }
+      }
+    }
+
+    if stats.processed > 0 || stats.failed > 0 {
+      ProcessingResult {
+        success: true,
+        message: "Processing completed".to_string(),
+        results: stats,
+      }
+    } else {
+      ProcessingResult {
+        success: false,
+        message: "No valid files to process".to_string(),
         results: stats,
       }
     }

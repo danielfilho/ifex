@@ -1,3 +1,5 @@
+//! Tests for utility functions.
+
 use ifex::utils::*;
 use std::path::Path;
 
@@ -29,6 +31,28 @@ fn test_clean_path_no_quotes() {
 fn test_clean_path_trims_whitespace() {
   let input = "  /path/to/file.jpg  ";
   assert_eq!(clean_path(input), "/path/to/file.jpg");
+}
+
+#[test]
+fn test_clean_path_expands_tilde() {
+  let input = "~/Documents/photos";
+  let result = clean_path(input);
+  
+  // Should expand tilde to home directory
+  assert!(result.starts_with('/'));
+  assert!(!result.starts_with('~'));
+  assert!(result.ends_with("/Documents/photos"));
+}
+
+#[test]
+fn test_clean_path_tilde_with_quotes() {
+  let input = "\"~/Documents/photos\"";
+  let result = clean_path(input);
+  
+  // Should remove quotes AND expand tilde
+  assert!(result.starts_with('/'));
+  assert!(!result.starts_with('~'));
+  assert!(result.ends_with("/Documents/photos"));
 }
 
 #[test]
