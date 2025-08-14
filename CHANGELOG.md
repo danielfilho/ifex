@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.102.0] - 2025-08-14
+
+### ✨ New Features
+- Enhanced file selector functionality for better user experience
+- Improved file management and processing capabilities
+
+### 🔧 Improvements  
+- Updated codebase structure and organization
+- Enhanced testing coverage and reliability
+- Better error handling and user feedback
+
+### 🏗️ Technical Changes
+- Added new file selector module for streamlined file operations
+- Improved code modularity and maintainability
+- Enhanced test suite with additional test cases
+
 ## [0.101.0] - 2025-07-27
 
 ### ✨ New Features

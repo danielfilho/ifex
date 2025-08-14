@@ -6,7 +6,7 @@
 
 A modern CLI tool for managing EXIF data in JPEG, TIFF, DNG, and RAW image files with structured equipment management. Built with Rust for performance and reliability.
 
-> **📢 Version 0.100.0**: Production-ready milestone! This release represents the maturity and stability of the Rust rewrite, with comprehensive testing and cross-platform support. Install via Homebrew or download from [releases](https://github.com/danielfilho/ifex/releases).
+> **📢 Version 0.102.0**: Latest stable release with enhanced features and improvements. Install via Homebrew or download from [releases](https://github.com/danielfilho/ifex/releases).
 
 ## Features
 
