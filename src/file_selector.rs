@@ -23,27 +23,22 @@ impl FileSelector {
 
   /// Scans a directory for supported image files.
   ///
-  /// Walks through the specified directory (optionally recursively) and
-  /// collects all supported image files. Returns a vector of file paths
-  /// sorted by filename for consistent presentation.
+  /// Walks through the specified directory recursively and collects all 
+  /// supported image files. Returns a vector of file paths sorted by 
+  /// filename for consistent presentation.
   ///
   /// # Arguments
   ///
   /// * `folder_path` - The directory to scan for image files
-  /// * `recursive` - Whether to scan subdirectories recursively
   ///
   /// # Returns
   ///
   /// A vector of `PathBuf` objects representing all supported image files found.
   #[must_use]
-  pub fn scan_directory(folder_path: &Path, recursive: bool) -> Vec<PathBuf> {
+  pub fn scan_directory(folder_path: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
 
-    let walker = if recursive {
-      WalkDir::new(folder_path)
-    } else {
-      WalkDir::new(folder_path).max_depth(1)
-    };
+    let walker = WalkDir::new(folder_path);
 
     for entry in walker.into_iter().flatten() {
       let path = entry.path();

@@ -20,6 +20,7 @@ use std::path::PathBuf;
 /// underlying data and coordinates between user input and EXIF operations.
 pub struct Interface {
   data_manager: DataManager,
+  one_sec: bool,
 }
 
 impl Interface {
@@ -27,9 +28,9 @@ impl Interface {
   ///
   /// Initializes the data manager by loading the configuration from disk.
   /// Returns an error if the configuration cannot be loaded.
-  pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
+  pub fn new(one_sec: bool) -> Result<Self, Box<dyn std::error::Error>> {
     let data_manager = DataManager::new()?;
-    Ok(Self { data_manager })
+    Ok(Self { data_manager, one_sec })
   }
 
   /// Runs the main application menu loop.
@@ -100,14 +101,8 @@ impl Interface {
     }
     let _folder_path = folder_path.unwrap();
 
-    let recursive = self.prompt_recursive_processing()?;
-    if recursive.is_none() {
-      return Ok(());
-    }
-    let _recursive = recursive.unwrap();
-
     // New file selection interface
-    let selected_files = PromptUtils::select_files_from_folder(&_folder_path, _recursive)?;
+    let selected_files = PromptUtils::select_files_from_folder(&_folder_path)?;
     if selected_files.is_none() {
       println!("{}", "No files selected. Returning to main menu.".yellow());
       return Ok(());
@@ -117,11 +112,12 @@ impl Interface {
     println!("{}", "\n📝 Applying EXIF data...\n".blue());
 
     let exif_manager = crate::ExifManager::new();
-    let result = exif_manager.process_selected_files(
+    let result = exif_manager.process_selected_files_with_one_sec(
       &selected_files,
       Some(&selection),
       "apply",
       Some(shot_iso),
+      self.one_sec,
     );
 
     if result.success {
@@ -179,12 +175,6 @@ impl Interface {
     }
     let _folder_path = folder_path.unwrap();
 
-    let recursive = self.prompt_recursive_processing()?;
-    if recursive.is_none() {
-      return Ok(());
-    }
-    let _recursive = recursive.unwrap();
-
     let confirmed = self.confirm_erase_exif()?;
     if confirmed != Some(true) {
       println!("{}", "Operation cancelled.".yellow());
@@ -194,7 +184,7 @@ impl Interface {
     println!("{}", "\n🗑️  Erasing EXIF data...\n".blue());
 
     let exif_manager = crate::ExifManager::new();
-    let result = exif_manager.process_folder(&_folder_path, None, "erase", _recursive);
+    let result = exif_manager.process_folder(&_folder_path, None, "erase");
 
     if result.success {
       println!(
@@ -373,13 +363,6 @@ impl Interface {
     }
   }
 
-  /// Prompts the user whether to process subdirectories recursively.
-  ///
-  /// Defaults to true (recursive processing enabled).
-  /// Returns None if the user cancels the operation.
-  fn prompt_recursive_processing(&self) -> Result<Option<bool>, Box<dyn std::error::Error>> {
-    PromptUtils::prompt_confirm("Process subdirectories recursively?", true)
-  }
 
   /// Prompts the user to confirm EXIF data erasure.
   ///

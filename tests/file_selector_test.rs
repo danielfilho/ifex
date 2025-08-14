@@ -16,8 +16,8 @@ fn test_scan_directory_finds_supported_files() {
     fs::write(temp_path.join("image3.tiff"), b"fake tiff data").expect("Failed to write test file");
     fs::write(temp_path.join("document.txt"), b"text file").expect("Failed to write test file"); // Not supported
 
-    // Test non-recursive scanning
-    let files = FileSelector::scan_directory(temp_path, false);
+    // Test scanning
+    let files = FileSelector::scan_directory(temp_path);
 
     // Should find 2 supported image files (jpg and tiff)
     assert_eq!(files.len(), 2);
@@ -46,13 +46,9 @@ fn test_scan_directory_recursive() {
     fs::write(temp_path.join("root.jpg"), b"fake jpeg data").expect("Failed to write test file");
     fs::write(sub_dir.join("sub.tiff"), b"fake tiff data").expect("Failed to write test file");
 
-    // Test recursive scanning
-    let files = FileSelector::scan_directory(temp_path, true);
-    assert_eq!(files.len(), 2);
-
-    // Test non-recursive scanning
-    let files_non_recursive = FileSelector::scan_directory(temp_path, false);
-    assert_eq!(files_non_recursive.len(), 1); // Only root.jpg
+    // Test recursive scanning (now the default and only behavior)
+    let files = FileSelector::scan_directory(temp_path);
+    assert_eq!(files.len(), 2); // Should find both root.jpg and subdir/sub.tiff
 }
 
 #[test]
@@ -74,6 +70,6 @@ fn test_empty_directory() {
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
     let temp_path = temp_dir.path();
 
-    let files = FileSelector::scan_directory(temp_path, false);
+    let files = FileSelector::scan_directory(temp_path);
     assert_eq!(files.len(), 0);
 }

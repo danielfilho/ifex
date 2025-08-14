@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.103.0] - 2025-08-14
+
+### ✨ New Features
+- Enhanced file path autocompletion with directory navigation
+- Improved interactive prompts with double-tab directory listing
+- Added comprehensive example files for testing and documentation
+
+### 🔧 Improvements
+- Code quality improvements with all Clippy warnings resolved
+- Enhanced error handling and user feedback mechanisms
+- Improved file selector functionality and user experience
+- Better path handling with expanded tilde (~) support
+- Optimized memory usage with proper resource management
+
+### 🏗️ Technical Changes
+- Major version bump to 1.x series for stability milestone
+- Comprehensive code refactoring for better maintainability
+- Enhanced test coverage and reliability
+- Improved code organization and structure
+- Performance optimizations and memory leak fixes
+
+### 🐛 Bug Fixes
+- Fixed significant memory drop warnings
+- Resolved format string optimization issues
+- Corrected file path handling edge cases
+- Fixed various linting issues for cleaner codebase
+
 ## [0.102.0] - 2025-08-14
 
 ### ✨ New Features

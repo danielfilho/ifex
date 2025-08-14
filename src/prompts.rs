@@ -14,6 +14,8 @@ use std::{
   time::{SystemTime, UNIX_EPOCH},
 };
 
+const MAX_DISPLAY: usize = 10;
+
 /// Path autocompleter for file system paths.
 ///
 /// Implements the Autocomplete trait to provide tab completion for folder paths,
@@ -48,6 +50,7 @@ impl PathAutocompleter {
     let is_double = input == *last_input && now - *last_time < 500; // 500ms threshold
     
     *last_input = input.to_string();
+    drop(last_input);
     *last_time = now;
     
     is_double
@@ -90,7 +93,7 @@ impl PathAutocompleter {
         }
         
         if entry.path().is_dir() {
-          dirs.push(format!("{}/", file_name));
+          dirs.push(format!("{file_name}/"));
         } else {
           files.push(file_name);
         }
@@ -103,11 +106,12 @@ impl PathAutocompleter {
       // Check if both are empty before iterating
       let is_empty = dirs.is_empty() && files.is_empty();
       
-      if !is_empty {
+      if is_empty {
+        println!("  {}", "Empty directory".yellow().italic());
+      } else {
         // Display in a more compact format - show first 10 items
         let total_items = dirs.len() + files.len();
         let mut displayed = 0;
-        const MAX_DISPLAY: usize = 10;
         
         // Display directories first
         for dir in &dirs {
@@ -132,8 +136,6 @@ impl PathAutocompleter {
         if total_items > MAX_DISPLAY {
           println!("  {} {}", "...".yellow(), format!("and {} more items", total_items - MAX_DISPLAY).yellow());
         }
-      } else {
-        println!("  {}", "Empty directory".yellow().italic());
       }
     } else {
       println!("  {}", "Cannot read directory".red());
@@ -157,17 +159,17 @@ impl Autocomplete for PathAutocompleter {
   }
 
   fn get_completion(&mut self, input: &str, highlighted_suggestion: Option<String>) -> Result<inquire::autocompletion::Replacement, Box<dyn std::error::Error + Send + Sync>> {
-    match highlighted_suggestion {
-      Some(suggestion) => {
-        Ok(inquire::autocompletion::Replacement::Some(suggestion))
-      }
-      None => {
-        // If there's no highlighted suggestion, try to find a common prefix
-        let suggestions = PromptUtils::internal_path_autocompleter(input);
-        if suggestions.len() == 1 {
+    if let Some(suggestion) = highlighted_suggestion {
+      Ok(inquire::autocompletion::Replacement::Some(suggestion))
+    } else {
+      // If there's no highlighted suggestion, try to find a common prefix
+      let suggestions = PromptUtils::internal_path_autocompleter(input);
+      match suggestions.len().cmp(&1) {
+        std::cmp::Ordering::Equal => {
           // If there's exactly one suggestion, use it
           Ok(inquire::autocompletion::Replacement::Some(suggestions[0].clone()))
-        } else if suggestions.len() > 1 {
+        }
+        std::cmp::Ordering::Greater => {
           // If there are multiple suggestions, find common prefix
           let common_prefix = find_common_prefix(&suggestions);
           if common_prefix.len() > input.len() {
@@ -175,7 +177,8 @@ impl Autocomplete for PathAutocompleter {
           } else {
             Ok(inquire::autocompletion::Replacement::None)
           }
-        } else {
+        }
+        std::cmp::Ordering::Less => {
           Ok(inquire::autocompletion::Replacement::None)
         }
       }
@@ -295,32 +298,28 @@ impl PromptUtils {
           let suggestion = if expanded_input.ends_with('/') || expanded_input.ends_with('\\') {
             // When input ends with separator, append the filename to the input
             if full_path.is_dir() {
-              format!("{}{}/", expanded_input, file_name)
+              format!("{expanded_input}{file_name}/")
             } else {
-              format!("{}{}", expanded_input, file_name)
+              format!("{expanded_input}{file_name}")
             }
           } else {
             // When input doesn't end with separator, replace the last component
             if let Some(parent) = Path::new(&expanded_input).parent() {
               if parent.to_string_lossy().is_empty() || parent == Path::new(".") {
                 if full_path.is_dir() {
-                  format!("{}/", file_name)
+                  format!("{file_name}/")
                 } else {
                   file_name.clone()
                 }
+              } else if full_path.is_dir() {
+                format!("{}/{}/", parent.to_string_lossy(), file_name)
               } else {
-                if full_path.is_dir() {
-                  format!("{}/{}/", parent.to_string_lossy(), file_name)
-                } else {
-                  format!("{}/{}", parent.to_string_lossy(), file_name)
-                }
+                format!("{}/{}", parent.to_string_lossy(), file_name)
               }
+            } else if full_path.is_dir() {
+              format!("{file_name}/")
             } else {
-              if full_path.is_dir() {
-                format!("{}/", file_name)
-              } else {
-                file_name.clone()
-              }
+              file_name.clone()
             }
           };
 
@@ -484,7 +483,6 @@ impl PromptUtils {
   /// # Arguments
   ///
   /// * `folder_path` - The directory to scan for image files
-  /// * `recursive` - Whether to scan subdirectories recursively
   ///
   /// # Returns
   ///
@@ -495,9 +493,8 @@ impl PromptUtils {
   /// Returns an error if the prompt fails for reasons other than user cancellation.
   pub fn select_files_from_folder(
     folder_path: &Path,
-    recursive: bool,
   ) -> Result<Option<Vec<PathBuf>>, Box<dyn std::error::Error>> {
-    let files = FileSelector::scan_directory(folder_path, recursive);
+    let files = FileSelector::scan_directory(folder_path);
 
     if files.is_empty() {
       println!(
@@ -516,6 +513,21 @@ impl PromptUtils {
       )
       .blue()
     );
+
+    // First, ask if user wants to select all files
+    let select_all_option = Self::prompt_confirm("Select all files?", false)?;
+    
+    if select_all_option == Some(true) {
+      println!(
+        "{}",
+        format!("✅ Selected all {} file{} for processing", files.len(), if files.len() == 1 { "" } else { "s" }).green()
+      );
+      return Ok(Some(files));
+    } else if select_all_option.is_none() {
+      // User cancelled
+      return Ok(None);
+    }
+
     println!(
       "{}",
       "Use arrow keys to navigate, spacebar to select/deselect, Enter to confirm:"

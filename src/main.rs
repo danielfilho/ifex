@@ -16,7 +16,7 @@ fn main() {
   let result = match &cli.command {
     Some(Commands::Manage) => run_management(),
     Some(Commands::Read { file }) => check_exif_data(file),
-    Some(Commands::Run) | None => run_interactive(),
+    Some(Commands::Run) | None => run_interactive(cli.one_sec),
   };
 
   if let Err(e) = result {
@@ -26,10 +26,10 @@ fn main() {
 }
 
 /// Run the interactive main menu interface
-fn run_interactive() -> Result<()> {
+fn run_interactive(one_sec: bool) -> Result<()> {
   println!("{}", "🏷️  IFEX - EXIF Data Manager\n".blue());
 
-  let mut interface = Interface::new()?;
+  let mut interface = Interface::new(one_sec)?;
   interface.run_main_menu()?;
   Ok(())
 }
@@ -38,7 +38,7 @@ fn run_interactive() -> Result<()> {
 fn run_management() -> Result<()> {
   println!("{}", "🏷️  IFEX - Equipment Manager\n".blue());
 
-  let mut interface = Interface::new()?;
+  let mut interface = Interface::new(false)?;
   interface.run_management_menu()?;
   Ok(())
 }

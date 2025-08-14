@@ -15,6 +15,10 @@ pub struct Cli {
   /// Optional subcommand to execute
   #[command(subcommand)]
   pub command: Option<Commands>,
+  
+  /// Enable automatic creation date adjustment with 1-second increments for photos with identical timestamps
+  #[arg(long = "one-sec")]
+  pub one_sec: bool,
 }
 
 /// Available CLI commands
