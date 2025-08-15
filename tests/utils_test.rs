@@ -37,7 +37,7 @@ fn test_clean_path_trims_whitespace() {
 fn test_clean_path_expands_tilde() {
   let input = "~/Documents/photos";
   let result = clean_path(input);
-  
+
   // Should expand tilde to home directory
   assert!(result.starts_with('/'));
   assert!(!result.starts_with('~'));
@@ -48,7 +48,7 @@ fn test_clean_path_expands_tilde() {
 fn test_clean_path_tilde_with_quotes() {
   let input = "\"~/Documents/photos\"";
   let result = clean_path(input);
-  
+
   // Should remove quotes AND expand tilde
   assert!(result.starts_with('/'));
   assert!(!result.starts_with('~'));

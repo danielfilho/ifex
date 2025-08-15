@@ -98,31 +98,42 @@ impl ExifManager {
 
     // Check if all dates are the same (within 1 second to account for precision differences)
     let first_date = creation_dates[0];
-    Ok(creation_dates.iter().all(|&date| {
-      (date - first_date).abs() <= chrono::Duration::seconds(1)
-    }))
+    Ok(
+      creation_dates
+        .iter()
+        .all(|&date| (date - first_date).abs() <= chrono::Duration::seconds(1)),
+    )
   }
 
   /// Gets the creation date from EXIF data
-  fn get_creation_date(&self, file_path: &Path) -> Result<DateTime<Local>, Box<dyn std::error::Error>> {
+  fn get_creation_date(
+    &self,
+    file_path: &Path,
+  ) -> Result<DateTime<Local>, Box<dyn std::error::Error>> {
     let exif_data = Self::read_exif_data(file_path)?;
-    
+
     // Look for DateTimeOriginal first, then DateTime, then DateTimeDigitized
     for (tag_name, value) in &exif_data {
-      if tag_name == "Date/Time Original" || tag_name == "Date/Time" || tag_name == "Date/Time Digitized" {
+      if tag_name == "Date/Time Original"
+        || tag_name == "Date/Time"
+        || tag_name == "Date/Time Digitized"
+      {
         if let Ok(naive_dt) = NaiveDateTime::parse_from_str(value, "%Y:%m:%d %H:%M:%S") {
-          return Ok(DateTime::from_naive_utc_and_offset(naive_dt, *Local::now().offset()));
+          return Ok(DateTime::from_naive_utc_and_offset(
+            naive_dt,
+            *Local::now().offset(),
+          ));
         }
       }
     }
-    
+
     Err("No valid creation date found in EXIF data".into())
   }
 
   /// Prompts user whether to set identical dates for different timestamps
   fn prompt_set_identical_dates(&self) -> Result<bool, Box<dyn std::error::Error>> {
     use crate::prompts::PromptUtils;
-    
+
     println!("The photos have different creation dates.");
     match PromptUtils::prompt_confirm(
       "Do you want to set the same creation date for all photos with 1-second increments?",
@@ -142,7 +153,9 @@ impl ExifManager {
     // Sort files by filename for consistent ordering
     let mut sorted_files = files.to_vec();
     sorted_files.sort_by(|a, b| {
-      a.file_name().unwrap_or_default().cmp(b.file_name().unwrap_or_default())
+      a.file_name()
+        .unwrap_or_default()
+        .cmp(b.file_name().unwrap_or_default())
     });
 
     // Get the original creation date from the first file
@@ -163,7 +176,11 @@ impl ExifManager {
   }
 
   /// Sets the creation date in EXIF data
-  fn set_creation_date(&self, file_path: &Path, new_date: DateTime<Local>) -> Result<(), Box<dyn std::error::Error>> {
+  fn set_creation_date(
+    &self,
+    file_path: &Path,
+    new_date: DateTime<Local>,
+  ) -> Result<(), Box<dyn std::error::Error>> {
     // Format the date for EXIF
     let date_string = new_date.format("%Y:%m:%d %H:%M:%S").to_string();
 
@@ -179,7 +196,10 @@ impl ExifManager {
   }
 
   /// Handles the date adjustment logic for a set of files
-  fn handle_date_adjustment(&self, file_paths: &[PathBuf]) -> Result<(), Box<dyn std::error::Error>> {
+  fn handle_date_adjustment(
+    &self,
+    file_paths: &[PathBuf],
+  ) -> Result<(), Box<dyn std::error::Error>> {
     let has_identical_dates = self.check_identical_dates(file_paths)?;
 
     if has_identical_dates {
@@ -198,7 +218,11 @@ impl ExifManager {
   }
 
   /// Handles the date adjustment logic for a set of files with --one-sec flag
-  fn handle_date_adjustment_with_one_sec(&self, file_paths: &[PathBuf], one_sec: bool) -> Result<(), Box<dyn std::error::Error>> {
+  fn handle_date_adjustment_with_one_sec(
+    &self,
+    file_paths: &[PathBuf],
+    one_sec: bool,
+  ) -> Result<(), Box<dyn std::error::Error>> {
     if !one_sec {
       return Ok(());
     }
@@ -342,7 +366,7 @@ impl ExifManager {
         eprintln!("Warning: Failed to adjust creation dates: {e}");
       }
     }
-    
+
     self.process_files_internal(file_paths, selection, operation, shot_iso)
   }
 
@@ -369,7 +393,7 @@ impl ExifManager {
         eprintln!("Warning: Failed to adjust creation dates: {e}");
       }
     }
-    
+
     self.process_files_internal(file_paths, selection, operation, shot_iso)
   }
 

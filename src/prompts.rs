@@ -6,7 +6,9 @@
 
 use crate::{file_selector::FileSelector, models::Selection};
 use colored::Colorize;
-use inquire::{autocompletion::Autocomplete, Confirm, CustomType, InquireError, MultiSelect, Select, Text};
+use inquire::{
+  autocompletion::Autocomplete, Confirm, CustomType, InquireError, MultiSelect, Select, Text,
+};
 use std::{
   fs,
   path::{Path, PathBuf},
@@ -34,28 +36,28 @@ impl PathAutocompleter {
       last_tab_time: Arc::new(Mutex::new(0)),
     }
   }
-  
+
   fn get_current_time() -> u64 {
     SystemTime::now()
       .duration_since(UNIX_EPOCH)
       .unwrap_or_default()
       .as_millis() as u64
   }
-  
+
   fn is_double_tab(&self, input: &str) -> bool {
     let now = Self::get_current_time();
     let mut last_input = self.last_input.lock().unwrap();
     let mut last_time = self.last_tab_time.lock().unwrap();
-    
+
     let is_double = input == *last_input && now - *last_time < 500; // 500ms threshold
-    
+
     *last_input = input.to_string();
     drop(last_input);
     *last_time = now;
-    
+
     is_double
   }
-  
+
   fn show_directory_listing(&self, input: &str) {
     let expanded_input = if input.starts_with('~') {
       if let Some(home) = dirs::home_dir() {
@@ -78,41 +80,52 @@ impl PathAutocompleter {
       Path::new(".")
     };
 
-    println!("\n{}", format!("📂 Contents of {} (continue typing or press Tab to autocomplete):", dir_to_list.display()).cyan().bold());
-    
+    println!(
+      "\n{}",
+      format!(
+        "📂 Contents of {} (continue typing or press Tab to autocomplete):",
+        dir_to_list.display()
+      )
+      .cyan()
+      .bold()
+    );
+
     if let Ok(entries) = fs::read_dir(dir_to_list) {
       let mut files = Vec::new();
       let mut dirs = Vec::new();
-      
+
       for entry in entries.flatten() {
         let file_name = entry.file_name().to_string_lossy().to_string();
-        
+
         // Skip hidden files/directories unless input starts with .
-        if file_name.starts_with('.') && !expanded_input.ends_with("/.") && !expanded_input.contains("/.") {
+        if file_name.starts_with('.')
+          && !expanded_input.ends_with("/.")
+          && !expanded_input.contains("/.")
+        {
           continue;
         }
-        
+
         if entry.path().is_dir() {
           dirs.push(format!("{file_name}/"));
         } else {
           files.push(file_name);
         }
       }
-      
+
       // Sort directories and files separately
       dirs.sort();
       files.sort();
-      
+
       // Check if both are empty before iterating
       let is_empty = dirs.is_empty() && files.is_empty();
-      
+
       if is_empty {
         println!("  {}", "Empty directory".yellow().italic());
       } else {
         // Display in a more compact format - show first 10 items
         let total_items = dirs.len() + files.len();
         let mut displayed = 0;
-        
+
         // Display directories first
         for dir in &dirs {
           if displayed < MAX_DISPLAY {
@@ -122,7 +135,7 @@ impl PathAutocompleter {
             break;
           }
         }
-        
+
         // Then display files
         for file in &files {
           if displayed < MAX_DISPLAY {
@@ -132,33 +145,44 @@ impl PathAutocompleter {
             break;
           }
         }
-        
+
         if total_items > MAX_DISPLAY {
-          println!("  {} {}", "...".yellow(), format!("and {} more items", total_items - MAX_DISPLAY).yellow());
+          println!(
+            "  {} {}",
+            "...".yellow(),
+            format!("and {} more items", total_items - MAX_DISPLAY).yellow()
+          );
         }
       }
     } else {
       println!("  {}", "Cannot read directory".red());
     }
-    
+
     println!(); // Empty line for better readability
   }
 }
 
 impl Autocomplete for PathAutocompleter {
-  fn get_suggestions(&mut self, input: &str) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
+  fn get_suggestions(
+    &mut self,
+    input: &str,
+  ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
     // Check for double tab and show directory listing
     if self.is_double_tab(input) {
       self.show_directory_listing(input);
       // Return empty suggestions so the input stays the same
       return Ok(vec![]);
     }
-    
+
     let suggestions = PromptUtils::internal_path_autocompleter(input);
     Ok(suggestions)
   }
 
-  fn get_completion(&mut self, input: &str, highlighted_suggestion: Option<String>) -> Result<inquire::autocompletion::Replacement, Box<dyn std::error::Error + Send + Sync>> {
+  fn get_completion(
+    &mut self,
+    input: &str,
+    highlighted_suggestion: Option<String>,
+  ) -> Result<inquire::autocompletion::Replacement, Box<dyn std::error::Error + Send + Sync>> {
     if let Some(suggestion) = highlighted_suggestion {
       Ok(inquire::autocompletion::Replacement::Some(suggestion))
     } else {
@@ -167,7 +191,9 @@ impl Autocomplete for PathAutocompleter {
       match suggestions.len().cmp(&1) {
         std::cmp::Ordering::Equal => {
           // If there's exactly one suggestion, use it
-          Ok(inquire::autocompletion::Replacement::Some(suggestions[0].clone()))
+          Ok(inquire::autocompletion::Replacement::Some(
+            suggestions[0].clone(),
+          ))
         }
         std::cmp::Ordering::Greater => {
           // If there are multiple suggestions, find common prefix
@@ -178,9 +204,7 @@ impl Autocomplete for PathAutocompleter {
             Ok(inquire::autocompletion::Replacement::None)
           }
         }
-        std::cmp::Ordering::Less => {
-          Ok(inquire::autocompletion::Replacement::None)
-        }
+        std::cmp::Ordering::Less => Ok(inquire::autocompletion::Replacement::None),
       }
     }
   }
@@ -191,14 +215,14 @@ fn find_common_prefix(strings: &[String]) -> String {
   if strings.is_empty() {
     return String::new();
   }
-  
+
   if strings.len() == 1 {
     return strings[0].clone();
   }
-  
+
   let mut prefix = String::new();
   let first = &strings[0];
-  
+
   for (i, ch) in first.chars().enumerate() {
     if strings.iter().all(|s| s.chars().nth(i) == Some(ch)) {
       prefix.push(ch);
@@ -206,7 +230,7 @@ fn find_common_prefix(strings: &[String]) -> String {
       break;
     }
   }
-  
+
   prefix
 }
 
@@ -293,7 +317,7 @@ impl PromptUtils {
         // Only suggest directories and files that match the prefix
         if file_name.starts_with(&prefix) {
           let full_path = entry.path();
-          
+
           // Build the suggestion based on the original input context
           let suggestion = if expanded_input.ends_with('/') || expanded_input.ends_with('\\') {
             // When input ends with separator, append the filename to the input
@@ -516,11 +540,16 @@ impl PromptUtils {
 
     // First, ask if user wants to select all files
     let select_all_option = Self::prompt_confirm("Select all files?", false)?;
-    
+
     if select_all_option == Some(true) {
       println!(
         "{}",
-        format!("✅ Selected all {} file{} for processing", files.len(), if files.len() == 1 { "" } else { "s" }).green()
+        format!(
+          "✅ Selected all {} file{} for processing",
+          files.len(),
+          if files.len() == 1 { "" } else { "s" }
+        )
+        .green()
       );
       return Ok(Some(files));
     } else if select_all_option.is_none() {
@@ -530,8 +559,7 @@ impl PromptUtils {
 
     println!(
       "{}",
-      "Use arrow keys to navigate, spacebar to select/deselect, Enter to confirm:"
-        .cyan()
+      "Use arrow keys to navigate, spacebar to select/deselect, Enter to confirm:".cyan()
     );
 
     // Create display options with relative paths
@@ -561,7 +589,12 @@ impl PromptUtils {
         } else {
           println!(
             "{}",
-            format!("✅ Selected {} file{} for processing", selected_files.len(), if selected_files.len() == 1 { "" } else { "s" }).green()
+            format!(
+              "✅ Selected {} file{} for processing",
+              selected_files.len(),
+              if selected_files.len() == 1 { "" } else { "s" }
+            )
+            .green()
           );
           Ok(Some(selected_files))
         }

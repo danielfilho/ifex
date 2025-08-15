@@ -30,7 +30,10 @@ impl Interface {
   /// Returns an error if the configuration cannot be loaded.
   pub fn new(one_sec: bool) -> Result<Self, Box<dyn std::error::Error>> {
     let data_manager = DataManager::new()?;
-    Ok(Self { data_manager, one_sec })
+    Ok(Self {
+      data_manager,
+      one_sec,
+    })
   }
 
   /// Runs the main application menu loop.
@@ -362,7 +365,6 @@ impl Interface {
       Ok(None)
     }
   }
-
 
   /// Prompts the user to confirm EXIF data erasure.
   ///

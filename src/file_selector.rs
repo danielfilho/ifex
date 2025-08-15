@@ -23,8 +23,8 @@ impl FileSelector {
 
   /// Scans a directory for supported image files.
   ///
-  /// Walks through the specified directory recursively and collects all 
-  /// supported image files. Returns a vector of file paths sorted by 
+  /// Walks through the specified directory recursively and collects all
+  /// supported image files. Returns a vector of file paths sorted by
   /// filename for consistent presentation.
   ///
   /// # Arguments

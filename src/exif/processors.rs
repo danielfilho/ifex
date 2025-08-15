@@ -33,7 +33,10 @@ impl JpegProcessor {
   /// Sets the creation date in a JPEG file's EXIF data.
   ///
   /// Updates the `DateTimeOriginal`, `DateTime`, and `DateTimeDigitized` fields in the EXIF data.
-  pub fn set_creation_date(path: &Path, date_string: &str) -> Result<(), Box<dyn std::error::Error>> {
+  pub fn set_creation_date(
+    path: &Path,
+    date_string: &str,
+  ) -> Result<(), Box<dyn std::error::Error>> {
     let file = fs::File::open(path)?;
     let mut bufreader = BufReader::new(&file);
 
@@ -1110,13 +1113,16 @@ impl TiffProcessor {
   ///
   /// Updates the `DateTimeOriginal`, `DateTime`, and `DateTimeDigitized` fields in the EXIF data.
   /// Note: This is a basic implementation that will be enhanced in the future.
-  pub fn set_creation_date(path: &Path, _date_string: &str) -> Result<(), Box<dyn std::error::Error>> {
+  pub fn set_creation_date(
+    path: &Path,
+    _date_string: &str,
+  ) -> Result<(), Box<dyn std::error::Error>> {
     // For now, we'll just re-save the TIFF file to preserve it
     // A full implementation would need to properly modify TIFF EXIF data
     let img = image::open(path)?;
     let mut output_file = fs::File::create(path)?;
     img.write_to(&mut output_file, image::ImageFormat::Tiff)?;
-    
+
     // TODO: Implement proper TIFF EXIF date modification
     println!("Note: TIFF date modification is not fully implemented yet. File preserved.");
     Ok(())
@@ -1227,9 +1233,12 @@ impl RawProcessor {
   /// Sets the creation date in a RAW file's XMP sidecar.
   ///
   /// Updates or creates an XMP file with the new creation date.
-  pub fn set_creation_date(path: &Path, date_string: &str) -> Result<(), Box<dyn std::error::Error>> {
+  pub fn set_creation_date(
+    path: &Path,
+    date_string: &str,
+  ) -> Result<(), Box<dyn std::error::Error>> {
     let xmp_path = path.with_extension("xmp");
-    
+
     // Create basic XMP content with date information
     let xmp_content = format!(
       r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -1243,7 +1252,7 @@ impl RawProcessor {
   </rdf:RDF>
 </x:xmpmeta>"#
     );
-    
+
     fs::write(&xmp_path, xmp_content)?;
     Ok(())
   }
