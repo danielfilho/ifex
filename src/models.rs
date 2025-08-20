@@ -184,7 +184,7 @@ impl Photographer {
 
   /// Returns a human-readable display name for the photographer.
   ///
-  /// If email is provided, format: "Name <email>"
+  /// If email is provided, format: "Name \<email\>"
   /// Otherwise, format: "Name"
   #[must_use]
   pub fn display_name(&self) -> String {

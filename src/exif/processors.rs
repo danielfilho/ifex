@@ -304,9 +304,14 @@ impl JpegProcessor {
       let tag_name = Self::format_tag_name(&field.tag);
       let mut value = Self::format_exif_value(&field.value);
 
-      // Truncate long values
+      // Truncate long values (UTF-8 safe)
       if value.len() > 50 {
-        value.truncate(50);
+        // Ensure we truncate at a valid UTF-8 boundary
+        let mut truncate_at = 50;
+        while truncate_at > 0 && !value.is_char_boundary(truncate_at) {
+          truncate_at -= 1;
+        }
+        value.truncate(truncate_at);
         value.push('…');
       }
 
@@ -392,9 +397,14 @@ impl JpegProcessor {
           if !value.is_empty() {
             let tag_name = Self::format_iptc_tag(record, dataset);
             let mut display_value = value;
-            // Truncate long values
+            // Truncate long values (UTF-8 safe)
             if display_value.len() > 50 {
-              display_value.truncate(50);
+              // Ensure we truncate at a valid UTF-8 boundary
+              let mut truncate_at = 50;
+              while truncate_at > 0 && !display_value.is_char_boundary(truncate_at) {
+                truncate_at -= 1;
+              }
+              display_value.truncate(truncate_at);
               display_value.push('…');
             }
             results.push((format!("IPTC: {tag_name}"), display_value));
@@ -1180,9 +1190,14 @@ impl TiffProcessor {
       let tag_name = JpegProcessor::format_tag_name(&field.tag);
       let mut value = JpegProcessor::format_exif_value(&field.value);
 
-      // Truncate long values
+      // Truncate long values (UTF-8 safe)
       if value.len() > 50 {
-        value.truncate(50);
+        // Ensure we truncate at a valid UTF-8 boundary
+        let mut truncate_at = 50;
+        while truncate_at > 0 && !value.is_char_boundary(truncate_at) {
+          truncate_at -= 1;
+        }
+        value.truncate(truncate_at);
         value.push('…');
       }
 

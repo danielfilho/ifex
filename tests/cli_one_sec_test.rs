@@ -19,7 +19,7 @@ fn test_one_sec_flag_conditionally_processes_dates() {
   // Create test equipment
   let selection = create_test_selection();
 
-  let file_paths = vec![test_file1.clone(), test_file2.clone()];
+  let file_paths = vec![test_file1, test_file2];
 
   let exif_manager = ExifManager::new();
 
