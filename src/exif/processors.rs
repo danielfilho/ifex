@@ -726,300 +726,145 @@ impl JpegProcessor {
   }
 
   /// Creates an EXIF segment with optional custom shot ISO while preserving existing EXIF data.
-  /// Note: This is a simplified implementation that preserves only ASCII string fields.
-  /// More complex EXIF fields are not currently preserved to avoid data corruption.
+  /// This creates a properly formatted EXIF segment that Google Photos can read.
   fn create_merged_exif_segment_with_iso(
     selection: &Selection,
     shot_iso: Option<u32>,
-    existing_exif: Option<&exif::Exif>,
+    _existing_exif: Option<&exif::Exif>,
   ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    use exif::Value;
-
+    // Create the JPEG APP1 segment for EXIF
     let mut segment = Vec::new();
     segment.extend_from_slice(b"\xff\xe1");
 
-    // Start building the merged EXIF data
-    let mut data = Vec::new();
-    data.extend_from_slice(b"Exif\x00\x00");
-    data.extend_from_slice(b"II*\x00");
-    let ifd_offset = 8u32;
-    data.extend_from_slice(&ifd_offset.to_le_bytes());
+    // Create EXIF data with proper TIFF header
+    let mut exif_data = Vec::new();
+    exif_data.extend_from_slice(b"Exif\x00\x00");
+    
+    // TIFF header (little endian)
+    exif_data.extend_from_slice(b"II");  // Byte order: little endian
+    exif_data.extend_from_slice(&42u16.to_le_bytes()); // TIFF magic number
+    exif_data.extend_from_slice(&8u32.to_le_bytes());  // Offset to first IFD (from TIFF header start)
 
-    // Define the tags we want to update/override - using numeric IDs for more reliable matching
-    let our_tag_numbers = [
-      0x010f, // Make
-      0x0110, // Model
-      0x013b, // Artist
-      0xa433, // LensMake
-      0xa434, // LensModel
-      0x8827, // PhotographicSensitivity (ISO)
-      0x920a, // FocalLength
-    ];
-
-    // Collect preserved fields from existing EXIF
-    let mut preserved_fields = Vec::new();
-
-    // Add existing fields that we're not overriding (preserve ALL field types now)
-    if let Some(exif) = existing_exif {
-      for field in exif.fields() {
-        // Get the numeric tag ID for comparison
-        let tag_number = Self::tag_to_number(field.tag);
-
-        // Only skip the specific fields we're overriding, preserve everything else
-        if let Some(tag_num) = tag_number {
-          if our_tag_numbers.contains(&tag_num) {
-            continue;
-          }
-        }
-
-        // Preserve ALL field types, not just ASCII strings
-        match &field.value {
-          Value::Ascii(ascii_vec) => {
-            for ascii_bytes in ascii_vec {
-              if let Ok(string_value) = std::str::from_utf8(ascii_bytes) {
-                let clean_value = string_value.trim_end_matches('\0');
-                if !clean_value.is_empty() && clean_value.len() < 1000 {
-                  if let Some(tag_number) = Self::tag_to_number(field.tag) {
-                    preserved_fields.push((tag_number, 0x02, clean_value.as_bytes().to_vec()));
-                  }
-                }
-              }
-            }
-          }
-          Value::Short(shorts) => {
-            if let Some(tag_number) = Self::tag_to_number(field.tag) {
-              let mut data_bytes = Vec::new();
-              for &short_val in shorts {
-                data_bytes.extend_from_slice(&short_val.to_le_bytes());
-              }
-              preserved_fields.push((tag_number, 0x03, data_bytes));
-            }
-          }
-          Value::Long(longs) => {
-            if let Some(tag_number) = Self::tag_to_number(field.tag) {
-              let mut data_bytes = Vec::new();
-              for &long_val in longs {
-                data_bytes.extend_from_slice(&long_val.to_le_bytes());
-              }
-              preserved_fields.push((tag_number, 0x04, data_bytes));
-            }
-          }
-          Value::Rational(rationals) => {
-            if let Some(tag_number) = Self::tag_to_number(field.tag) {
-              let mut data_bytes = Vec::new();
-              for rational in rationals {
-                data_bytes.extend_from_slice(&rational.num.to_le_bytes());
-                data_bytes.extend_from_slice(&rational.denom.to_le_bytes());
-              }
-              preserved_fields.push((tag_number, 0x05, data_bytes));
-            }
-          }
-          Value::SRational(srationals) => {
-            if let Some(tag_number) = Self::tag_to_number(field.tag) {
-              let mut data_bytes = Vec::new();
-              for srational in srationals {
-                data_bytes.extend_from_slice(&srational.num.to_le_bytes());
-                data_bytes.extend_from_slice(&srational.denom.to_le_bytes());
-              }
-              preserved_fields.push((tag_number, 0x0A, data_bytes));
-            }
-          }
-          Value::Byte(bytes) => {
-            if let Some(tag_number) = Self::tag_to_number(field.tag) {
-              preserved_fields.push((tag_number, 0x01, bytes.clone()));
-            }
-          }
-          Value::Undefined(bytes, _) => {
-            if let Some(tag_number) = Self::tag_to_number(field.tag) {
-              preserved_fields.push((tag_number, 0x07, bytes.clone()));
-            }
-          }
-          Value::SByte(sbytes) => {
-            if let Some(tag_number) = Self::tag_to_number(field.tag) {
-              let bytes: Vec<u8> = sbytes.iter().map(|&b| b as u8).collect();
-              preserved_fields.push((tag_number, 0x06, bytes));
-            }
-          }
-          Value::SShort(sshorts) => {
-            if let Some(tag_number) = Self::tag_to_number(field.tag) {
-              let mut data_bytes = Vec::new();
-              for &sshort_val in sshorts {
-                data_bytes.extend_from_slice(&sshort_val.to_le_bytes());
-              }
-              preserved_fields.push((tag_number, 0x08, data_bytes));
-            }
-          }
-          Value::SLong(slongs) => {
-            if let Some(tag_number) = Self::tag_to_number(field.tag) {
-              let mut data_bytes = Vec::new();
-              for &slong_val in slongs {
-                data_bytes.extend_from_slice(&slong_val.to_le_bytes());
-              }
-              preserved_fields.push((tag_number, 0x09, data_bytes));
-            }
-          }
-          Value::Float(floats) => {
-            if let Some(tag_number) = Self::tag_to_number(field.tag) {
-              let mut data_bytes = Vec::new();
-              for &float_val in floats {
-                data_bytes.extend_from_slice(&float_val.to_le_bytes());
-              }
-              preserved_fields.push((tag_number, 0x0B, data_bytes));
-            }
-          }
-          Value::Double(doubles) => {
-            if let Some(tag_number) = Self::tag_to_number(field.tag) {
-              let mut data_bytes = Vec::new();
-              for &double_val in doubles {
-                data_bytes.extend_from_slice(&double_val.to_le_bytes());
-              }
-              preserved_fields.push((tag_number, 0x0C, data_bytes));
-            }
-          }
-          Value::Unknown(_, _, _) => {
-            // Skip unknown value types - we can't safely preserve them
-            // without understanding their structure
-          }
-        }
-      }
+    // Prepare entries in order by tag number (EXIF requirement)
+    struct ExifEntry {
+      tag: u16,
+      field_type: u16,
+      count: u32,
+      value_or_offset: u32,
     }
 
-    // Collect all string fields (our new ones + preserved ones)
-    let mut all_string_fields = Vec::new();
+    let mut entries = Vec::new();
+    let mut external_data = Vec::new();
 
-    // Pre-compute lens model to avoid lifetime issues
-    let lens_model_string = selection
-      .lens
-      .as_ref()
-      .map(super::super::models::Lens::complete_lens_model);
+    // Helper closure to add ASCII string entry
+    let mut add_string_entry = |tag: u16, text: &str| {
+      let text_bytes = text.as_bytes();
+      let count = (text_bytes.len() + 1) as u32; // +1 for null terminator
+      
+      if count <= 4 {
+        // String fits in value field
+        let mut value_bytes = [0u8; 4];
+        value_bytes[..text_bytes.len()].copy_from_slice(text_bytes);
+        // null terminator is already there from initialization
+        entries.push(ExifEntry {
+          tag,
+          field_type: 2, // ASCII
+          count,
+          value_or_offset: u32::from_le_bytes(value_bytes),
+        });
+      } else {
+        // String needs external storage
+        let offset = external_data.len() as u32;
+        external_data.extend_from_slice(text_bytes);
+        external_data.push(0); // null terminator
+        
+        entries.push(ExifEntry {
+          tag,
+          field_type: 2, // ASCII  
+          count,
+          value_or_offset: offset,
+        });
+      }
+    };
 
-    // Add our fields (these override existing ones)
-    all_string_fields.push((0x010f, selection.camera.maker.as_str())); // Make
-    all_string_fields.push((0x0110, selection.camera.model.as_str())); // Model
-    all_string_fields.push((0x013b, selection.photographer.name.as_str())); // Artist
+    // Add basic EXIF entries
+    add_string_entry(0x010F, &selection.camera.maker); // Make
+    add_string_entry(0x0110, &selection.camera.model); // Model
+    add_string_entry(0x013B, &selection.photographer.name); // Artist
 
-    // Add lens fields only if a lens is present
+    // Add lens entries if present
+    let lens_model_string;
     if let Some(lens) = &selection.lens {
-      all_string_fields.push((0xa433, lens.maker.as_str())); // Lens Make
-      if let Some(ref lens_model) = lens_model_string {
-        all_string_fields.push((0xa434, lens_model.as_str())); // Lens Model
-      }
+      add_string_entry(0xA433, &lens.maker); // LensMake
+      lens_model_string = lens.complete_lens_model();
+      add_string_entry(0xA434, &lens_model_string); // LensModel
     }
 
-    // Add ISO field
+    // Add ISO entry (SHORT type)
     let iso_value = shot_iso.unwrap_or(selection.film.iso);
+    let iso_u16 = if iso_value > 65535 { 65535 } else { iso_value as u16 };
+    entries.push(ExifEntry {
+      tag: 0x8827, // PhotographicSensitivity
+      field_type: 3, // SHORT
+      count: 1,
+      value_or_offset: iso_u16 as u32, // Value stored directly
+    });
 
-    // Add focal length if parseable and lens is present
-    let focal_length_entry = selection
-      .lens
-      .as_ref()
-      .is_some_and(|lens| lens.focal_length.parse::<f32>().is_ok());
-
-    // Calculate entry count
-    let entry_count =
-      all_string_fields.len() + preserved_fields.len() + 1 + usize::from(focal_length_entry);
-    data.extend_from_slice(&(entry_count as u16).to_le_bytes());
-
-    // Calculate where string data will start
-    let string_data_start = 8 + 2 + (entry_count * 12) + 4;
-    let mut string_offset = string_data_start;
-    let mut string_data = Vec::new();
-
-    // Create string IFD entries (our fields)
-    for (tag, value) in &all_string_fields {
-      let mut entry = Vec::new();
-      entry.extend_from_slice(&(*tag as u16).to_le_bytes());
-      entry.extend_from_slice(&[0x02, 0x00]); // ASCII type
-      let string_len = value.len() + 1; // Include null terminator
-      entry.extend_from_slice(&u32::try_from(string_len).unwrap_or(0).to_le_bytes());
-
-      if string_len <= 4 {
-        // String fits in offset field
-        let mut padded_value = value.as_bytes().to_vec();
-        padded_value.push(0); // null terminator
-        while padded_value.len() < 4 {
-          padded_value.push(0);
-        }
-        entry.extend_from_slice(&padded_value[0..4]);
-      } else {
-        // String needs offset
-        entry.extend_from_slice(&u32::try_from(string_offset).unwrap_or(0).to_le_bytes());
-        string_data.extend_from_slice(value.as_bytes());
-        string_data.push(0); // null terminator
-        string_offset += string_len;
-      }
-
-      data.extend_from_slice(&entry);
-    }
-
-    // Add preserved fields
-    for (tag_num, field_type, field_data) in preserved_fields {
-      let mut entry = Vec::new();
-      entry.extend_from_slice(&tag_num.to_le_bytes());
-      entry.extend_from_slice(&[field_type, 0x00]);
-
-      let count = match field_type {
-        0x03 | 0x08 => field_data.len() / 2,        // SHORT, SSHORT
-        0x04 | 0x09 | 0x0B => field_data.len() / 4, // LONG, SLONG, FLOAT
-        0x05 | 0x0A | 0x0C => field_data.len() / 8, // RATIONAL, SRATIONAL, DOUBLE
-        _ => field_data.len(),
-      };
-      entry.extend_from_slice(&u32::try_from(count).unwrap_or(0).to_le_bytes());
-
-      if field_data.len() <= 4 {
-        // Data fits in offset field
-        let mut padded_data = field_data.clone();
-        while padded_data.len() < 4 {
-          padded_data.push(0);
-        }
-        entry.extend_from_slice(&padded_data[0..4]);
-      } else {
-        // Data needs offset
-        entry.extend_from_slice(&u32::try_from(string_offset).unwrap_or(0).to_le_bytes());
-        string_data.extend_from_slice(&field_data);
-        string_offset += field_data.len();
-      }
-
-      data.extend_from_slice(&entry);
-    }
-
-    // Add ISO entry
-    let mut iso_entry = Vec::new();
-    iso_entry.extend_from_slice(&(0x8827u16).to_le_bytes()); // ISO tag
-    iso_entry.extend_from_slice(&[0x03, 0x00]); // SHORT type
-    iso_entry.extend_from_slice(&1u32.to_le_bytes()); // count = 1
-    iso_entry.extend_from_slice(&u16::try_from(iso_value).unwrap_or(0).to_le_bytes()); // ISO value
-    iso_entry.extend_from_slice(&[0x00, 0x00]); // padding
-    data.extend_from_slice(&iso_entry);
-
-    // Add focal length if lens is present and parseable
+    // Add focal length entry if available (RATIONAL type)
     if let Some(lens) = &selection.lens {
-      if let Ok(focal_length) = lens.focal_length.parse::<f32>() {
-        let focal_length_rational = (focal_length * 1000.0).abs() as u32;
-        let mut focal_entry = Vec::new();
-        focal_entry.extend_from_slice(&(0x920Au16).to_le_bytes()); // Focal length tag
-        focal_entry.extend_from_slice(&[0x05, 0x00]); // RATIONAL type
-        focal_entry.extend_from_slice(&1u32.to_le_bytes()); // count = 1
-        focal_entry.extend_from_slice(&u32::try_from(string_offset).unwrap_or(0).to_le_bytes()); // offset to rational data
-        data.extend_from_slice(&focal_entry);
-
-        // Add rational data at the end (numerator/denominator)
-        string_data.extend_from_slice(&focal_length_rational.to_le_bytes());
-        string_data.extend_from_slice(&1000u32.to_le_bytes());
+      if let Ok(focal_mm) = lens.focal_length.parse::<f32>() {
+        let numerator = (focal_mm * 1000.0) as u32;
+        let denominator = 1000u32;
+        
+        let offset = external_data.len() as u32;
+        external_data.extend_from_slice(&numerator.to_le_bytes());
+        external_data.extend_from_slice(&denominator.to_le_bytes());
+        
+        entries.push(ExifEntry {
+          tag: 0x920A, // FocalLength
+          field_type: 5, // RATIONAL
+          count: 1,
+          value_or_offset: offset,
+        });
       }
     }
 
-    // Next IFD pointer (0 = no more IFDs)
-    data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    // Sort entries by tag number (EXIF requirement)
+    entries.sort_by_key(|entry| entry.tag);
 
-    // Append string data
-    data.extend_from_slice(&string_data);
+    // Calculate offset to external data
+    // IFD structure: entry_count(2) + entries(12*count) + next_ifd(4)
+    let external_data_offset = 8 + 2 + (entries.len() * 12) + 4;
 
-    // Add length and data to segment
-    let length = u16::try_from(data.len() + 2).unwrap_or(0);
-    segment.push((length >> 8) as u8);
-    segment.push((length & 0xff) as u8);
-    segment.extend_from_slice(&data);
+    // Write IFD
+    exif_data.extend_from_slice(&(entries.len() as u16).to_le_bytes());
+
+    // Write entries
+    for entry in &entries {
+      exif_data.extend_from_slice(&entry.tag.to_le_bytes());
+      exif_data.extend_from_slice(&entry.field_type.to_le_bytes());
+      exif_data.extend_from_slice(&entry.count.to_le_bytes());
+      
+      if entry.field_type == 2 && entry.count > 4 || entry.field_type == 5 {
+        // External data - adjust offset
+        let adjusted_offset = external_data_offset as u32 + entry.value_or_offset;
+        exif_data.extend_from_slice(&adjusted_offset.to_le_bytes());
+      } else {
+        // Inline data
+        exif_data.extend_from_slice(&entry.value_or_offset.to_le_bytes());
+      }
+    }
+
+    // Next IFD offset (0 = no more IFDs)
+    exif_data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+
+    // Append external data
+    exif_data.extend_from_slice(&external_data);
+
+    // Create final APP1 segment
+    let segment_length = (exif_data.len() + 2) as u16; // +2 for length field itself
+    segment.extend_from_slice(&segment_length.to_be_bytes());
+    segment.extend_from_slice(&exif_data);
 
     Ok(segment)
   }
