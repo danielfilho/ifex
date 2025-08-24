@@ -745,7 +745,8 @@ impl JpegProcessor {
     exif_data.extend_from_slice(&42u16.to_le_bytes()); // TIFF magic number
     exif_data.extend_from_slice(&8u32.to_le_bytes());  // Offset to first IFD (from TIFF header start)
 
-    // Prepare entries in order by tag number (EXIF requirement)
+    // Define entry structure for EXIF entries
+    #[allow(clippy::items_after_statements)]
     struct ExifEntry {
       tag: u16,
       field_type: u16,
@@ -807,7 +808,7 @@ impl JpegProcessor {
       tag: 0x8827, // PhotographicSensitivity
       field_type: 3, // SHORT
       count: 1,
-      value_or_offset: iso_u16 as u32, // Value stored directly
+      value_or_offset: u32::from(iso_u16), // Value stored directly
     });
 
     // Add focal length entry if available (RATIONAL type)
