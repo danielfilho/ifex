@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.103.3] - 2025-08-24
+
+### 🐛 Bug Fixes
+- **Fixed EXIF/IPTC metadata display in Google Photos**: Completely rewrote EXIF segment generation for JPEG files
+  - Resolved "Truncated IFD" errors that prevented metadata readers from parsing EXIF data
+  - Fixed malformed TIFF header structure in EXIF segments
+  - Corrected field ordering requirements (entries now properly sorted by tag number)
+  - Fixed offset calculations for external data storage
+  - Ensured specification compliance with TIFF 6.0 and EXIF 2.32 standards
+- **Improved EXIF data compatibility**: Metadata now properly displays in Google Photos, Apple Photos, and other applications
+- **Enhanced data integrity**: All EXIF fields (camera make/model, lens info, ISO, focal length) are now correctly embedded
+
+### 🔧 Code Quality
+- Resolved all Clippy warnings for cleaner, more maintainable code
+- Fixed lossless casting warnings and code organization issues
+- Improved error handling and memory safety in EXIF processing
+
 ## [1.103.0] - 2025-08-14
 
 ### ✨ New Features
