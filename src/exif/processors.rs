@@ -739,11 +739,11 @@ impl JpegProcessor {
     // Create EXIF data with proper TIFF header
     let mut exif_data = Vec::new();
     exif_data.extend_from_slice(b"Exif\x00\x00");
-    
+
     // TIFF header (little endian)
-    exif_data.extend_from_slice(b"II");  // Byte order: little endian
+    exif_data.extend_from_slice(b"II"); // Byte order: little endian
     exif_data.extend_from_slice(&42u16.to_le_bytes()); // TIFF magic number
-    exif_data.extend_from_slice(&8u32.to_le_bytes());  // Offset to first IFD (from TIFF header start)
+    exif_data.extend_from_slice(&8u32.to_le_bytes()); // Offset to first IFD (from TIFF header start)
 
     // Define entry structure for EXIF entries
     #[allow(clippy::items_after_statements)]
@@ -761,7 +761,7 @@ impl JpegProcessor {
     let mut add_string_entry = |tag: u16, text: &str| {
       let text_bytes = text.as_bytes();
       let count = (text_bytes.len() + 1) as u32; // +1 for null terminator
-      
+
       if count <= 4 {
         // String fits in value field
         let mut value_bytes = [0u8; 4];
@@ -778,10 +778,10 @@ impl JpegProcessor {
         let offset = external_data.len() as u32;
         external_data.extend_from_slice(text_bytes);
         external_data.push(0); // null terminator
-        
+
         entries.push(ExifEntry {
           tag,
-          field_type: 2, // ASCII  
+          field_type: 2, // ASCII
           count,
           value_or_offset: offset,
         });
@@ -803,9 +803,13 @@ impl JpegProcessor {
 
     // Add ISO entry (SHORT type)
     let iso_value = shot_iso.unwrap_or(selection.film.iso);
-    let iso_u16 = if iso_value > 65535 { 65535 } else { iso_value as u16 };
+    let iso_u16 = if iso_value > 65535 {
+      65535
+    } else {
+      iso_value as u16
+    };
     entries.push(ExifEntry {
-      tag: 0x8827, // PhotographicSensitivity
+      tag: 0x8827,   // PhotographicSensitivity
       field_type: 3, // SHORT
       count: 1,
       value_or_offset: u32::from(iso_u16), // Value stored directly
@@ -816,13 +820,13 @@ impl JpegProcessor {
       if let Ok(focal_mm) = lens.focal_length.parse::<f32>() {
         let numerator = (focal_mm * 1000.0) as u32;
         let denominator = 1000u32;
-        
+
         let offset = external_data.len() as u32;
         external_data.extend_from_slice(&numerator.to_le_bytes());
         external_data.extend_from_slice(&denominator.to_le_bytes());
-        
+
         entries.push(ExifEntry {
-          tag: 0x920A, // FocalLength
+          tag: 0x920A,   // FocalLength
           field_type: 5, // RATIONAL
           count: 1,
           value_or_offset: offset,
@@ -845,7 +849,7 @@ impl JpegProcessor {
       exif_data.extend_from_slice(&entry.tag.to_le_bytes());
       exif_data.extend_from_slice(&entry.field_type.to_le_bytes());
       exif_data.extend_from_slice(&entry.count.to_le_bytes());
-      
+
       if entry.field_type == 2 && entry.count > 4 || entry.field_type == 5 {
         // External data - adjust offset
         let adjusted_offset = external_data_offset as u32 + entry.value_or_offset;
