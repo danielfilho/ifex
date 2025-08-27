@@ -764,12 +764,22 @@ impl JpegProcessor {
       if count <= 4 {
         let mut v = [0u8; 4];
         v[..bytes.len()].copy_from_slice(bytes);
-        ifd0_entries.push(ExifEntry { tag, field_type: 2, count, value_or_offset: u32::from_le_bytes(v) });
+        ifd0_entries.push(ExifEntry {
+          tag,
+          field_type: 2,
+          count,
+          value_or_offset: u32::from_le_bytes(v),
+        });
       } else {
         let off = ifd0_external.len() as u32;
         ifd0_external.extend_from_slice(bytes);
         ifd0_external.push(0);
-        ifd0_entries.push(ExifEntry { tag, field_type: 2, count, value_or_offset: off });
+        ifd0_entries.push(ExifEntry {
+          tag,
+          field_type: 2,
+          count,
+          value_or_offset: off,
+        });
       }
     };
 
@@ -778,7 +788,12 @@ impl JpegProcessor {
     add_ifd0_ascii(0x013B, &selection.photographer.name); // Artist
 
     // Placeholder ExifIFDPointer (0x8769), LONG
-    ifd0_entries.push(ExifEntry { tag: 0x8769, field_type: 4, count: 1, value_or_offset: 0 });
+    ifd0_entries.push(ExifEntry {
+      tag: 0x8769,
+      field_type: 4,
+      count: 1,
+      value_or_offset: 0,
+    });
 
     // Sort entries
     ifd0_entries.sort_by_key(|e| e.tag);
@@ -815,29 +830,58 @@ impl JpegProcessor {
       if count <= 4 {
         let mut v = [0u8; 4];
         v[..bytes.len()].copy_from_slice(bytes);
-        entries.push(ExifEntry { tag, field_type: 2, count, value_or_offset: u32::from_le_bytes(v) });
+        entries.push(ExifEntry {
+          tag,
+          field_type: 2,
+          count,
+          value_or_offset: u32::from_le_bytes(v),
+        });
       } else {
         let off = external.len() as u32;
         external.extend_from_slice(bytes);
         external.push(0);
-        entries.push(ExifEntry { tag, field_type: 2, count, value_or_offset: off });
+        entries.push(ExifEntry {
+          tag,
+          field_type: 2,
+          count,
+          value_or_offset: off,
+        });
       }
     }
 
     // ExifVersion (Undefined, 4 bytes) set to "0232"
     let ver = *b"0232";
-    exif_entries.push(ExifEntry { tag: 0x9000, field_type: 7, count: 4, value_or_offset: u32::from_le_bytes(ver) });
+    exif_entries.push(ExifEntry {
+      tag: 0x9000,
+      field_type: 7,
+      count: 4,
+      value_or_offset: u32::from_le_bytes(ver),
+    });
 
     // ISO (SHORT)
     let iso_value = shot_iso.unwrap_or(selection.film.iso);
-    let iso_u16 = if iso_value > 65535 { 65535 } else { iso_value as u16 };
-    exif_entries.push(ExifEntry { tag: 0x8827, field_type: 3, count: 1, value_or_offset: u32::from(iso_u16) });
+    let iso_u16 = if iso_value > 65535 {
+      65535
+    } else {
+      iso_value as u16
+    };
+    exif_entries.push(ExifEntry {
+      tag: 0x8827,
+      field_type: 3,
+      count: 1,
+      value_or_offset: u32::from(iso_u16),
+    });
 
     // Lens info & focal length
     if let Some(lens) = &selection.lens {
       add_exif_ascii(&mut exif_entries, &mut exif_external, 0xA433, &lens.maker); // LensMake
       let lens_model_string = lens.complete_lens_model();
-      add_exif_ascii(&mut exif_entries, &mut exif_external, 0xA434, &lens_model_string); // LensModel
+      add_exif_ascii(
+        &mut exif_entries,
+        &mut exif_external,
+        0xA434,
+        &lens_model_string,
+      ); // LensModel
 
       if let Ok(focal_mm) = lens.focal_length.parse::<f32>() {
         let num = (focal_mm * 1000.0) as u32;
@@ -845,7 +889,12 @@ impl JpegProcessor {
         let off = exif_external.len() as u32;
         exif_external.extend_from_slice(&num.to_le_bytes());
         exif_external.extend_from_slice(&den.to_le_bytes());
-        exif_entries.push(ExifEntry { tag: 0x920A, field_type: 5, count: 1, value_or_offset: off });
+        exif_entries.push(ExifEntry {
+          tag: 0x920A,
+          field_type: 5,
+          count: 1,
+          value_or_offset: off,
+        });
       }
     }
 
@@ -869,7 +918,8 @@ impl JpegProcessor {
     // Serialize Exif SubIFD
     let mut exif_ifd_buf = Vec::new();
     exif_ifd_buf.extend_from_slice(&(exif_entries.len() as u16).to_le_bytes());
-    let exif_external_offset = (exif_ifd_offset_from_tiff_start as usize) + 2 + (exif_entries.len() * 12) + 4;
+    let exif_external_offset =
+      (exif_ifd_offset_from_tiff_start as usize) + 2 + (exif_entries.len() * 12) + 4;
     for e in &exif_entries {
       exif_ifd_buf.extend_from_slice(&e.tag.to_le_bytes());
       exif_ifd_buf.extend_from_slice(&e.field_type.to_le_bytes());
