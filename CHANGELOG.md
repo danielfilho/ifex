@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### ✨ New Features
+- **Enhanced read command**: Extended EXIF inspection capabilities
+  - Support for multiple file inputs: `ifex read file1.jpg file2.png file3.tiff`
+  - Directory processing: `ifex read /path/to/photos/` scans all supported image files
+  - JSON output format: `ifex read --json` for structured data output suitable for scripts and APIs
+  - Batch EXIF inspection with improved error handling for each file
+- **Improved CLI interface**: Updated command descriptions and help text to reflect new capabilities
+
+### 🔧 Improvements
+- Enhanced file processing logic to handle multiple inputs efficiently
+- Better error reporting for unsupported file formats and missing files
+- Improved user experience with clearer output formatting for multiple files
+- Added file format validation before processing
+
+### 🏗️ Technical Changes
+- Refactored `check_exif_data()` function to accept multiple paths and JSON output flag
+- Integrated `FileSelector::scan_directory()` for directory processing
+- Added JSON serialization for EXIF data output
+- Enhanced error handling with per-file validation and reporting
+
 ## [1.103.3] - 2025-08-24
 
 ### 🐛 Bug Fixes

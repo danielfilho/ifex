@@ -107,7 +107,18 @@ ifex manage
 ### EXIF Inspection
 
 ```bash
+# Single file
 ifex read /path/to/image.jpg
+
+# Multiple files
+ifex read photo1.jpg photo2.png photo3.tiff
+
+# Directory processing
+ifex read /path/to/photos/
+
+# JSON output format
+ifex read --json /path/to/image.jpg
+ifex read --json /path/to/photos/
 ```
 
 ### Available Commands
@@ -115,7 +126,8 @@ ifex read /path/to/image.jpg
 - `ifex` - Run interactive mode with all options
 - `ifex manage` - Equipment management only
 - `ifex run` - Explicit interactive mode (same as default)
-- `ifex read <file>` - Read and display EXIF data from an image file
+- `ifex read <paths...>` - Read and display EXIF data from image files or directories
+- `ifex read --json <paths...>` - Output EXIF data in JSON format
 
 ## Equipment Management
 
@@ -156,13 +168,27 @@ The tool stores equipment data in a JSON file with separate collections for:
 
 ### EXIF Inspection
 
-Use the read command to view EXIF data from any supported image file:
+Use the read command to view EXIF data from any supported image file or directory:
 
 ```bash
+# Single file with table output
 ifex read /path/to/image.jpg
+
+# Multiple files
+ifex read photo1.jpg photo2.png
+
+# Process entire directory
+ifex read /path/to/photos/
+
+# JSON output for programmatic use
+ifex read --json /path/to/image.jpg
 ```
 
-This displays a formatted table with all EXIF fields including camera, lens, and film information.
+The command supports:
+- **Single files**: Display EXIF data in a formatted table
+- **Multiple files**: Process several files in sequence
+- **Directory scanning**: Automatically find and process all supported image files in a directory
+- **JSON output**: Use `--json` flag for structured output suitable for scripts or APIs
 
 ## EXIF Fields Mapped
 
@@ -237,6 +263,7 @@ cargo fmt --check
 cargo run
 cargo run -- manage
 cargo run -- read /path/to/image.jpg
+cargo run -- read --json /path/to/photos/
 ```
 
 ## Architecture
