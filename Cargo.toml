@@ -1,6 +1,6 @@
 [package]
 name = "ifex"
-version = "1.103.3"
+version = "1.104.0"
 edition = "2021"
 rust-version = "1.70"
 description = "A modern CLI tool for managing EXIF data in JPEG, TIFF, DNG and RAW image files with structured equipment management"
