@@ -46,12 +46,15 @@ fn run_management() -> Result<()> {
 /// Check and display EXIF data from image files or directories
 #[allow(clippy::unnecessary_wraps, clippy::too_many_lines)]
 fn check_exif_data(paths: &[std::path::PathBuf], json: bool) -> Result<()> {
-  use ifex::{prompts::PromptUtils, ExifManager, file_selector::FileSelector, utils::is_supported_image_format};
+  use ifex::{
+    file_selector::FileSelector, prompts::PromptUtils, utils::is_supported_image_format,
+    ExifManager,
+  };
   use serde_json::{json, Value};
 
   // Collect all image files from the provided paths
   let mut all_files = Vec::new();
-  
+
   for path in paths {
     if path.is_file() {
       if is_supported_image_format(path) {
@@ -60,7 +63,10 @@ fn check_exif_data(paths: &[std::path::PathBuf], json: bool) -> Result<()> {
         // In JSON mode, we still need to include unsupported files with error
         all_files.push(path.clone());
       } else {
-        println!("{}", format!("⚠️  Unsupported file format: {}", path.display()).yellow());
+        println!(
+          "{}",
+          format!("⚠️  Unsupported file format: {}", path.display()).yellow()
+        );
       }
     } else if path.is_dir() {
       let directory_files = FileSelector::scan_directory(path);
@@ -69,18 +75,21 @@ fn check_exif_data(paths: &[std::path::PathBuf], json: bool) -> Result<()> {
       // Path doesn't exist - we'll handle this in the processing loop
       all_files.push(path.clone());
     } else {
-      println!("{}", format!("❌ Path does not exist: {}", path.display()).red());
+      println!(
+        "{}",
+        format!("❌ Path does not exist: {}", path.display()).red()
+      );
     }
   }
 
   if json {
     // JSON output format - always return an array
     let mut json_results = Vec::new();
-    
+
     for file in &all_files {
       let mut file_result = serde_json::Map::new();
       file_result.insert("file".to_string(), json!(file.display().to_string()));
-      
+
       if !file.exists() {
         file_result.insert("error".to_string(), json!("File does not exist"));
       } else if !is_supported_image_format(file) {
@@ -88,20 +97,22 @@ fn check_exif_data(paths: &[std::path::PathBuf], json: bool) -> Result<()> {
       } else {
         match ExifManager::read_exif_data(file) {
           Ok(exif_data) => {
-            let exif_map: std::collections::HashMap<String, String> = exif_data
-              .into_iter()
-              .collect();
+            let exif_map: std::collections::HashMap<String, String> =
+              exif_data.into_iter().collect();
             file_result.insert("exif".to_string(), json!(exif_map));
           }
           Err(e) => {
-            file_result.insert("error".to_string(), json!(format!("Error reading EXIF data: {e}")));
+            file_result.insert(
+              "error".to_string(),
+              json!(format!("Error reading EXIF data: {e}")),
+            );
           }
         }
       }
-      
+
       json_results.push(Value::Object(file_result));
     }
-    
+
     match serde_json::to_string_pretty(&json_results) {
       Ok(json_string) => println!("{json_string}"),
       Err(e) => println!("{{\"error\": \"Failed to serialize JSON: {e}\"}}"),
@@ -110,15 +121,21 @@ fn check_exif_data(paths: &[std::path::PathBuf], json: bool) -> Result<()> {
     // Original table format for each file
     for file in &all_files {
       if !file.exists() {
-        println!("{}", format!("❌ File does not exist: {}", file.display()).red());
+        println!(
+          "{}",
+          format!("❌ File does not exist: {}", file.display()).red()
+        );
         continue;
       }
-      
+
       if !is_supported_image_format(file) {
-        println!("{}", format!("⚠️  Unsupported file format: {}", file.display()).yellow());
+        println!(
+          "{}",
+          format!("⚠️  Unsupported file format: {}", file.display()).yellow()
+        );
         continue;
       }
-      
+
       println!(
         "{}",
         format!("📷 EXIF Data for: {}\n", file.display()).blue()
@@ -167,7 +184,7 @@ fn check_exif_data(paths: &[std::path::PathBuf], json: bool) -> Result<()> {
           println!("{}", format!("❌ Error reading EXIF data: {e}").red());
         }
       }
-      
+
       // Add spacing between files if there are multiple
       if all_files.len() > 1 {
         println!();
