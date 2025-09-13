@@ -13,12 +13,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Uses proper Film tag instead of ImageDescription to avoid overwriting existing metadata
   - Follows format: "Maker Name (ISO rating)" (e.g., "Fujifilm Santacolor 100 (ISO 100)")
   - Displays as "Film [Tag(Tiff, 649)]" in output
-- **Added JSON output option for read command**: Use `--json` flag to output EXIF data in JSON format
-  - Enables programmatic access to EXIF metadata
-  - Maintains backward compatibility with table format as default
+- **Enhanced read command**: Extended EXIF inspection capabilities
+  - Support for multiple file inputs: `ifex read file1.jpg file2.png file3.tiff`
+  - Directory processing: `ifex read /path/to/photos/` scans all supported image files
+  - JSON output format: `ifex read --json` for structured data output suitable for scripts and APIs
+  - Batch EXIF inspection with improved error handling for each file
 - **Enhanced EXIF preservation**: Improved EXIF merging to preserve existing metadata while adding new film information
   - Original IPTC data and other metadata are preserved during EXIF updates
   - Only equipment-specific fields are updated with new data
+- **Improved CLI interface**: Updated command descriptions and help text to reflect new capabilities
+
+### 🔧 Improvements
+- Enhanced file processing logic to handle multiple inputs efficiently
+- Better error reporting for unsupported file formats and missing files
+- Improved user experience with clearer output formatting for multiple files
+- Added file format validation before processing
+
+### 🏗️ Technical Changes
+- Refactored `check_exif_data()` function to accept multiple paths and JSON output flag
+- Integrated `FileSelector::scan_directory()` for directory processing
+- Added JSON serialization for EXIF data output
+- Enhanced error handling with per-file validation and reporting
 
 ### 🧪 Testing
 - Added comprehensive test coverage for film information in EXIF data

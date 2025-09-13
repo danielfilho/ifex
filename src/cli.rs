@@ -28,12 +28,12 @@ pub enum Commands {
   Run,
   /// Manage cameras, lenses, films, and setups
   Manage,
-  /// Read and display EXIF data from an image file in a formatted table
+  /// Read and display EXIF data from image files or directories in a formatted table
   Read {
-    /// Path to the image file
-    file: PathBuf,
-    /// Output EXIF data in JSON format
-    #[arg(long = "json")]
+    /// Paths to image files or directories
+    paths: Vec<PathBuf>,
+    /// Output in JSON format instead of table
+    #[arg(long)]
     json: bool,
   },
 }

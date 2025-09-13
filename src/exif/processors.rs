@@ -731,7 +731,7 @@ impl JpegProcessor {
   fn create_merged_exif_segment_with_iso(
     selection: &Selection,
     shot_iso: Option<u32>,
-    existing_exif: Option<&exif::Exif>,
+    _existing_exif: Option<&exif::Exif>,
   ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     // Create the JPEG APP1 segment for EXIF
     let mut segment = Vec::new();
@@ -755,161 +755,198 @@ impl JpegProcessor {
       value_or_offset: u32,
     }
 
-    let mut entries = Vec::new();
-    let mut external_data = Vec::new();
+    // -------- IFD0 (primary) --------
+    let mut ifd0_entries: Vec<ExifEntry> = Vec::new();
+    let mut ifd0_external: Vec<u8> = Vec::new();
 
-    // Track which tags we're adding to avoid duplicates
-    let mut added_tags = std::collections::HashSet::new();
-
-    // Helper closure to add ASCII string entry
-    let mut add_string_entry = |tag: u16, text: &str| {
-      if added_tags.contains(&tag) {
-        return; // Skip if already added
-      }
-      added_tags.insert(tag);
-      
-      let text_bytes = text.as_bytes();
-      let count = (text_bytes.len() + 1) as u32; // +1 for null terminator
-
+    let mut add_ifd0_ascii = |tag: u16, text: &str| {
+      let bytes = text.as_bytes();
+      let count = (bytes.len() + 1) as u32;
       if count <= 4 {
-        // String fits in value field
-        let mut value_bytes = [0u8; 4];
-        value_bytes[..text_bytes.len()].copy_from_slice(text_bytes);
-        // null terminator is already there from initialization
-        entries.push(ExifEntry {
+        let mut v = [0u8; 4];
+        v[..bytes.len()].copy_from_slice(bytes);
+        ifd0_entries.push(ExifEntry {
           tag,
-          field_type: 2, // ASCII
+          field_type: 2,
           count,
-          value_or_offset: u32::from_le_bytes(value_bytes),
+          value_or_offset: u32::from_le_bytes(v),
         });
       } else {
-        // String needs external storage
-        let offset = external_data.len() as u32;
-        external_data.extend_from_slice(text_bytes);
-        external_data.push(0); // null terminator
-
-        entries.push(ExifEntry {
+        let off = ifd0_external.len() as u32;
+        ifd0_external.extend_from_slice(bytes);
+        ifd0_external.push(0);
+        ifd0_entries.push(ExifEntry {
           tag,
-          field_type: 2, // ASCII
+          field_type: 2,
           count,
-          value_or_offset: offset,
+          value_or_offset: off,
         });
       }
     };
 
-    // First, preserve existing EXIF data (if any)
-    if let Some(exif) = existing_exif {
-      for field in exif.fields() {
-        if let Some(tag_number) = Self::tag_to_number(field.tag) {
-          // Skip tags we're going to override with our equipment data
-          let our_tags = [0x010F, 0x0110, 0x013B, 0x0289, 0xA433, 0xA434, 0x8827, 0x920A];
-          if our_tags.contains(&tag_number) {
-            continue; // We'll add these later with our data
-          }
-          
-          // Preserve existing field
-          if let Value::Ascii(ascii_vec) = &field.value {
-            for ascii_bytes in ascii_vec {
-              if let Ok(string_value) = std::str::from_utf8(ascii_bytes) {
-                let clean_value = string_value.trim_end_matches('\0');
-                if !clean_value.is_empty() && clean_value.len() < 1000 {
-                  add_string_entry(tag_number, clean_value);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+    // Add equipment EXIF entries
+    add_ifd0_ascii(0x010F, &selection.camera.maker); // Make
+    add_ifd0_ascii(0x0110, &selection.camera.model); // Model
+    add_ifd0_ascii(0x013B, &selection.photographer.name); // Artist
 
-    // Add our equipment EXIF entries (these may override existing data)
-    add_string_entry(0x010F, &selection.camera.maker); // Make
-    add_string_entry(0x0110, &selection.camera.model); // Model
-    add_string_entry(0x013B, &selection.photographer.name); // Artist
-
-    // Add film information to Film field (new feature)
+    // Add film information to Film field (0x0289)
     let film_info = format!("{} {} (ISO {})", 
       selection.film.maker, 
       selection.film.name, 
       selection.film.iso);
-    add_string_entry(0x0289, &film_info); // Film
+    add_ifd0_ascii(0x0289, &film_info); // Film
 
-    // Add lens entries if present
-    let lens_model_string;
-    if let Some(lens) = &selection.lens {
-      add_string_entry(0xA433, &lens.maker); // LensMake
-      lens_model_string = lens.complete_lens_model();
-      add_string_entry(0xA434, &lens_model_string); // LensModel
-    }
+    // Placeholder ExifIFDPointer (0x8769), LONG
+    ifd0_entries.push(ExifEntry {
+      tag: 0x8769,
+      field_type: 4,
+      count: 1,
+      value_or_offset: 0,
+    });
 
-    // Add ISO entry (SHORT type) if not already present
-    if added_tags.insert(0x8827) {
-      let iso_value = shot_iso.unwrap_or(selection.film.iso);
-      let iso_u16 = if iso_value > 65535 {
-        65535
+    // Sort entries
+    ifd0_entries.sort_by_key(|e| e.tag);
+
+    // Compute IFD0 external data start (from TIFF start)
+    let ifd0_external_offset = 8 + 2 + (ifd0_entries.len() * 12) + 4;
+
+    // We'll serialize IFD0 to a buffer so we can patch ExifIFDPointer later
+    let mut ifd0_buf = Vec::new();
+    ifd0_buf.extend_from_slice(&(ifd0_entries.len() as u16).to_le_bytes());
+    for e in &ifd0_entries {
+      ifd0_buf.extend_from_slice(&e.tag.to_le_bytes());
+      ifd0_buf.extend_from_slice(&e.field_type.to_le_bytes());
+      ifd0_buf.extend_from_slice(&e.count.to_le_bytes());
+      if e.field_type == 2 && e.count > 4 {
+        let adj = (ifd0_external_offset as u32) + e.value_or_offset;
+        ifd0_buf.extend_from_slice(&adj.to_le_bytes());
       } else {
-        iso_value as u16
-      };
-      entries.push(ExifEntry {
-        tag: 0x8827,   // PhotographicSensitivity
-        field_type: 3, // SHORT
-        count: 1,
-        value_or_offset: u32::from(iso_u16), // Value stored directly
-      });
+        ifd0_buf.extend_from_slice(&e.value_or_offset.to_le_bytes());
+      }
     }
+    // next IFD = 0
+    ifd0_buf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    ifd0_buf.extend_from_slice(&ifd0_external);
 
-    // Add focal length entry if available (RATIONAL type) and not already present
-    if let Some(lens) = &selection.lens {
-      if added_tags.insert(0x920A) {
-        if let Ok(focal_mm) = lens.focal_length.parse::<f32>() {
-          let numerator = (focal_mm * 1000.0) as u32;
-          let denominator = 1000u32;
+    // -------- Exif SubIFD --------
+    let mut exif_entries: Vec<ExifEntry> = Vec::new();
+    let mut exif_external: Vec<u8> = Vec::new();
 
-          let offset = external_data.len() as u32;
-          external_data.extend_from_slice(&numerator.to_le_bytes());
-          external_data.extend_from_slice(&denominator.to_le_bytes());
-
-          entries.push(ExifEntry {
-            tag: 0x920A,   // FocalLength
-            field_type: 5, // RATIONAL
-            count: 1,
-            value_or_offset: offset,
-          });
-        }
+    #[allow(clippy::items_after_statements)]
+    fn add_exif_ascii(entries: &mut Vec<ExifEntry>, external: &mut Vec<u8>, tag: u16, text: &str) {
+      let bytes = text.as_bytes();
+      let count = (bytes.len() + 1) as u32;
+      if count <= 4 {
+        let mut v = [0u8; 4];
+        v[..bytes.len()].copy_from_slice(bytes);
+        entries.push(ExifEntry {
+          tag,
+          field_type: 2,
+          count,
+          value_or_offset: u32::from_le_bytes(v),
+        });
+      } else {
+        let off = external.len() as u32;
+        external.extend_from_slice(bytes);
+        external.push(0);
+        entries.push(ExifEntry {
+          tag,
+          field_type: 2,
+          count,
+          value_or_offset: off,
+        });
       }
     }
 
-    // Sort entries by tag number (EXIF requirement)
-    entries.sort_by_key(|entry| entry.tag);
+    // ExifVersion (Undefined, 4 bytes) set to "0232"
+    let ver = *b"0232";
+    exif_entries.push(ExifEntry {
+      tag: 0x9000,
+      field_type: 7,
+      count: 4,
+      value_or_offset: u32::from_le_bytes(ver),
+    });
 
-    // Calculate offset to external data
-    // IFD structure: entry_count(2) + entries(12*count) + next_ifd(4)
-    let external_data_offset = 8 + 2 + (entries.len() * 12) + 4;
+    // ISO (SHORT)
+    let iso_value = shot_iso.unwrap_or(selection.film.iso);
+    let iso_u16 = if iso_value > 65535 {
+      65535
+    } else {
+      iso_value as u16
+    };
+    exif_entries.push(ExifEntry {
+      tag: 0x8827,
+      field_type: 3,
+      count: 1,
+      value_or_offset: u32::from(iso_u16),
+    });
 
-    // Write IFD
-    exif_data.extend_from_slice(&(entries.len() as u16).to_le_bytes());
+    // Lens info & focal length
+    if let Some(lens) = &selection.lens {
+      add_exif_ascii(&mut exif_entries, &mut exif_external, 0xA433, &lens.maker); // LensMake
+      let lens_model_string = lens.complete_lens_model();
+      add_exif_ascii(
+        &mut exif_entries,
+        &mut exif_external,
+        0xA434,
+        &lens_model_string,
+      ); // LensModel
 
-    // Write entries
-    for entry in &entries {
-      exif_data.extend_from_slice(&entry.tag.to_le_bytes());
-      exif_data.extend_from_slice(&entry.field_type.to_le_bytes());
-      exif_data.extend_from_slice(&entry.count.to_le_bytes());
-
-      if entry.field_type == 2 && entry.count > 4 || entry.field_type == 5 {
-        // External data - adjust offset
-        let adjusted_offset = external_data_offset as u32 + entry.value_or_offset;
-        exif_data.extend_from_slice(&adjusted_offset.to_le_bytes());
-      } else {
-        // Inline data
-        exif_data.extend_from_slice(&entry.value_or_offset.to_le_bytes());
+      if let Ok(focal_mm) = lens.focal_length.parse::<f32>() {
+        let num = (focal_mm * 1000.0) as u32;
+        let den = 1000u32;
+        let off = exif_external.len() as u32;
+        exif_external.extend_from_slice(&num.to_le_bytes());
+        exif_external.extend_from_slice(&den.to_le_bytes());
+        exif_entries.push(ExifEntry {
+          tag: 0x920A,
+          field_type: 5,
+          count: 1,
+          value_or_offset: off,
+        });
       }
     }
 
-    // Next IFD offset (0 = no more IFDs)
-    exif_data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    exif_entries.sort_by_key(|e| e.tag);
 
-    // Append external data
-    exif_data.extend_from_slice(&external_data);
+    // Offset where ExifIFD will be placed (from TIFF start)
+    let exif_ifd_offset_from_tiff_start = (8 + ifd0_buf.len()) as u32;
+
+    // Patch ExifIFDPointer in IFD0 buffer
+    let mut pos = 2usize; // skip count
+    for e in &ifd0_entries {
+      if e.tag == 0x8769 {
+        let write_at = pos + 2 + 2 + 4; // tag + type + count
+        let bytes = exif_ifd_offset_from_tiff_start.to_le_bytes();
+        ifd0_buf[write_at..write_at + 4].copy_from_slice(&bytes);
+        break;
+      }
+      pos += 12;
+    }
+
+    // Serialize Exif SubIFD
+    let mut exif_ifd_buf = Vec::new();
+    exif_ifd_buf.extend_from_slice(&(exif_entries.len() as u16).to_le_bytes());
+    let exif_external_offset =
+      (exif_ifd_offset_from_tiff_start as usize) + 2 + (exif_entries.len() * 12) + 4;
+    for e in &exif_entries {
+      exif_ifd_buf.extend_from_slice(&e.tag.to_le_bytes());
+      exif_ifd_buf.extend_from_slice(&e.field_type.to_le_bytes());
+      exif_ifd_buf.extend_from_slice(&e.count.to_le_bytes());
+      let needs_external = (e.field_type == 2 && e.count > 4) || e.field_type == 5;
+      if needs_external {
+        let adj = (exif_external_offset as u32) + e.value_or_offset;
+        exif_ifd_buf.extend_from_slice(&adj.to_le_bytes());
+      } else {
+        exif_ifd_buf.extend_from_slice(&e.value_or_offset.to_le_bytes());
+      }
+    }
+    exif_ifd_buf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // next IFD = 0
+    exif_ifd_buf.extend_from_slice(&exif_external);
+
+    // Build final EXIF payload: header + IFD0 + ExifIFD
+    exif_data.extend_from_slice(&ifd0_buf);
+    exif_data.extend_from_slice(&exif_ifd_buf);
 
     // Create final APP1 segment
     let segment_length = (exif_data.len() + 2) as u16; // +2 for length field itself
