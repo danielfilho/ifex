@@ -32,6 +32,9 @@ pub enum Commands {
   Read {
     /// Path to the image file
     file: PathBuf,
+    /// Output EXIF data in JSON format
+    #[arg(long = "json")]
+    json: bool,
   },
 }
 

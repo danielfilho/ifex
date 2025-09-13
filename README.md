@@ -6,7 +6,7 @@
 
 A modern CLI tool for managing EXIF data in JPEG, TIFF, DNG, and RAW image files with structured equipment management. Built with Rust for performance and reliability.
 
-> **📢 Version 1.103.0**: Latest stable release with enhanced features and improvements. Install via Homebrew or download from [releases](https://github.com/danielfilho/ifex/releases).
+> **📢 Version 1.105.0**: Latest stable release with film information support and JSON output. Install via Homebrew or download from [releases](https://github.com/danielfilho/ifex/releases).
 
 ## Features
 
@@ -33,7 +33,8 @@ A modern CLI tool for managing EXIF data in JPEG, TIFF, DNG, and RAW image files
 - 🔄 **Interactive Interface**: Easy-to-use menu system with enhanced UX
 - ✅ **Batch Processing**: Process entire folders at once with detailed reporting
 - 🛡️ **Robust Error Handling**: Graceful fallbacks and clear error messages
-- 🔍 **EXIF Inspection**: View EXIF data from image files in formatted tables
+- 🔍 **EXIF Inspection**: View EXIF data from image files in formatted tables or JSON format
+- 🎞️ **Film Information**: Dedicated EXIF field for film stock information (maker, name, ISO)
 - ⚡ **Performance**: Built with Rust for fast, reliable processing
 
 ## Installation
@@ -107,7 +108,11 @@ ifex manage
 ### EXIF Inspection
 
 ```bash
+# View EXIF data in formatted table
 ifex read /path/to/image.jpg
+
+# View EXIF data in JSON format
+ifex read --json /path/to/image.jpg
 ```
 
 ### Available Commands
@@ -116,6 +121,7 @@ ifex read /path/to/image.jpg
 - `ifex manage` - Equipment management only
 - `ifex run` - Explicit interactive mode (same as default)
 - `ifex read <file>` - Read and display EXIF data from an image file
+- `ifex read --json <file>` - Read and display EXIF data in JSON format
 
 ## Equipment Management
 
@@ -162,21 +168,22 @@ Use the read command to view EXIF data from any supported image file:
 ifex read /path/to/image.jpg
 ```
 
-This displays a formatted table with all EXIF fields including camera, lens, and film information.
+This displays a formatted table with all EXIF fields including camera, lens, and film information. Use the `--json` flag for machine-readable JSON output.
 
 ## EXIF Fields Mapped
 
-| Equipment Field | EXIF Tag |
-|-----------------|----------|
-| Camera Maker | Make |
-| Camera Model | Model |
-| Lens Maker | LensMake |
-| Lens Model | LensModel |
-| Focal Length | FocalLength |
-| Aperture | FNumber |
-| Film ISO | ISOSpeedRatings |
-| Shot ISO | ISOSpeed |
-| Photographer | Artist |
+| Equipment Field | EXIF Tag | Notes |
+|-----------------|----------|-------|
+| Camera Maker | Make | Camera manufacturer |
+| Camera Model | Model | Camera model name |
+| Lens Maker | LensMake | Lens manufacturer |
+| Lens Model | LensModel | Lens model with aperture |
+| Focal Length | FocalLength | Lens focal length in mm |
+| Aperture | FNumber | Maximum aperture of the lens |
+| Film Information | Film | Film maker, name, and ISO (new in v1.105.0) |
+| Film ISO | ISOSpeedRatings | Base ISO rating of the film |
+| Shot ISO | ISOSpeed | Actual ISO used (for push/pull processing) |
+| Photographer | Artist | Photographer name |
 
 ## Supported File Formats
 

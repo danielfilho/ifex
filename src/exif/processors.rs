@@ -572,6 +572,7 @@ impl JpegProcessor {
                 "41993" => return "Saturation".to_string(),
                 "41994" => return "Sharpness".to_string(),
                 "42016" => return "Image Unique ID".to_string(),
+                "649" => return "Film".to_string(), // 0x0289 = 649
                 _ => return format!("Tag {tag_num}"),
               }
             }
@@ -730,7 +731,7 @@ impl JpegProcessor {
   fn create_merged_exif_segment_with_iso(
     selection: &Selection,
     shot_iso: Option<u32>,
-    _existing_exif: Option<&exif::Exif>,
+    existing_exif: Option<&exif::Exif>,
   ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     // Create the JPEG APP1 segment for EXIF
     let mut segment = Vec::new();
@@ -757,8 +758,16 @@ impl JpegProcessor {
     let mut entries = Vec::new();
     let mut external_data = Vec::new();
 
+    // Track which tags we're adding to avoid duplicates
+    let mut added_tags = std::collections::HashSet::new();
+
     // Helper closure to add ASCII string entry
     let mut add_string_entry = |tag: u16, text: &str| {
+      if added_tags.contains(&tag) {
+        return; // Skip if already added
+      }
+      added_tags.insert(tag);
+      
       let text_bytes = text.as_bytes();
       let count = (text_bytes.len() + 1) as u32; // +1 for null terminator
 
@@ -788,10 +797,42 @@ impl JpegProcessor {
       }
     };
 
-    // Add basic EXIF entries
+    // First, preserve existing EXIF data (if any)
+    if let Some(exif) = existing_exif {
+      for field in exif.fields() {
+        if let Some(tag_number) = Self::tag_to_number(field.tag) {
+          // Skip tags we're going to override with our equipment data
+          let our_tags = [0x010F, 0x0110, 0x013B, 0x0289, 0xA433, 0xA434, 0x8827, 0x920A];
+          if our_tags.contains(&tag_number) {
+            continue; // We'll add these later with our data
+          }
+          
+          // Preserve existing field
+          if let Value::Ascii(ascii_vec) = &field.value {
+            for ascii_bytes in ascii_vec {
+              if let Ok(string_value) = std::str::from_utf8(ascii_bytes) {
+                let clean_value = string_value.trim_end_matches('\0');
+                if !clean_value.is_empty() && clean_value.len() < 1000 {
+                  add_string_entry(tag_number, clean_value);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Add our equipment EXIF entries (these may override existing data)
     add_string_entry(0x010F, &selection.camera.maker); // Make
     add_string_entry(0x0110, &selection.camera.model); // Model
     add_string_entry(0x013B, &selection.photographer.name); // Artist
+
+    // Add film information to Film field (new feature)
+    let film_info = format!("{} {} (ISO {})", 
+      selection.film.maker, 
+      selection.film.name, 
+      selection.film.iso);
+    add_string_entry(0x0289, &film_info); // Film
 
     // Add lens entries if present
     let lens_model_string;
@@ -801,36 +842,40 @@ impl JpegProcessor {
       add_string_entry(0xA434, &lens_model_string); // LensModel
     }
 
-    // Add ISO entry (SHORT type)
-    let iso_value = shot_iso.unwrap_or(selection.film.iso);
-    let iso_u16 = if iso_value > 65535 {
-      65535
-    } else {
-      iso_value as u16
-    };
-    entries.push(ExifEntry {
-      tag: 0x8827,   // PhotographicSensitivity
-      field_type: 3, // SHORT
-      count: 1,
-      value_or_offset: u32::from(iso_u16), // Value stored directly
-    });
+    // Add ISO entry (SHORT type) if not already present
+    if added_tags.insert(0x8827) {
+      let iso_value = shot_iso.unwrap_or(selection.film.iso);
+      let iso_u16 = if iso_value > 65535 {
+        65535
+      } else {
+        iso_value as u16
+      };
+      entries.push(ExifEntry {
+        tag: 0x8827,   // PhotographicSensitivity
+        field_type: 3, // SHORT
+        count: 1,
+        value_or_offset: u32::from(iso_u16), // Value stored directly
+      });
+    }
 
-    // Add focal length entry if available (RATIONAL type)
+    // Add focal length entry if available (RATIONAL type) and not already present
     if let Some(lens) = &selection.lens {
-      if let Ok(focal_mm) = lens.focal_length.parse::<f32>() {
-        let numerator = (focal_mm * 1000.0) as u32;
-        let denominator = 1000u32;
+      if added_tags.insert(0x920A) {
+        if let Ok(focal_mm) = lens.focal_length.parse::<f32>() {
+          let numerator = (focal_mm * 1000.0) as u32;
+          let denominator = 1000u32;
 
-        let offset = external_data.len() as u32;
-        external_data.extend_from_slice(&numerator.to_le_bytes());
-        external_data.extend_from_slice(&denominator.to_le_bytes());
+          let offset = external_data.len() as u32;
+          external_data.extend_from_slice(&numerator.to_le_bytes());
+          external_data.extend_from_slice(&denominator.to_le_bytes());
 
-        entries.push(ExifEntry {
-          tag: 0x920A,   // FocalLength
-          field_type: 5, // RATIONAL
-          count: 1,
-          value_or_offset: offset,
-        });
+          entries.push(ExifEntry {
+            tag: 0x920A,   // FocalLength
+            field_type: 5, // RATIONAL
+            count: 1,
+            value_or_offset: offset,
+          });
+        }
       }
     }
 
@@ -895,6 +940,8 @@ impl JpegProcessor {
       Tag::DateTime => Some(0x0132),
       Tag::Artist => Some(0x013b),
       Tag::Copyright => Some(0x8298),
+      // Add Film tag mapping
+      _ if format!("{tag:?}").contains("Tag(") && format!("{tag:?}").contains("649)") => Some(0x0289), // Film
       Tag::ExposureTime => Some(0x829a),
       Tag::FNumber => Some(0x829d),
       Tag::ExposureProgram => Some(0x8822),

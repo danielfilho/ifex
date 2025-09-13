@@ -15,7 +15,7 @@ fn main() {
 
   let result = match &cli.command {
     Some(Commands::Manage) => run_management(),
-    Some(Commands::Read { file }) => check_exif_data(file),
+    Some(Commands::Read { file, json }) => check_exif_data(file, *json),
     Some(Commands::Run) | None => run_interactive(cli.one_sec),
   };
 
@@ -45,7 +45,7 @@ fn run_management() -> Result<()> {
 
 /// Check and display EXIF data from an image file
 #[allow(clippy::unnecessary_wraps)]
-fn check_exif_data(file: &std::path::Path) -> Result<()> {
+fn check_exif_data(file: &std::path::Path, json_output: bool) -> Result<()> {
   use ifex::{prompts::PromptUtils, ExifManager};
 
   println!(
@@ -61,8 +61,24 @@ fn check_exif_data(file: &std::path::Path) -> Result<()> {
   match ExifManager::read_exif_data(file) {
     Ok(exif_data) => {
       if exif_data.is_empty() {
-        println!("{}", "⚠️  No EXIF data found in this image.".yellow());
+        if json_output {
+          println!("[]");
+        } else {
+          println!("{}", "⚠️  No EXIF data found in this image.".yellow());
+        }
+      } else if json_output {
+        // JSON output
+        let json_data: serde_json::Value = exif_data
+          .iter()
+          .map(|(tag, value)| (tag.clone(), serde_json::Value::String(value.clone())))
+          .collect::<serde_json::Map<String, serde_json::Value>>()
+          .into();
+        match serde_json::to_string_pretty(&json_data) {
+          Ok(json_str) => println!("{json_str}"),
+          Err(e) => eprintln!("{}", format!("Error serializing JSON: {e}").red()),
+        }
       } else {
+        // Table output
         println!(
           "{}",
           format!("📷 EXIF Data ({} entries)\n", exif_data.len()).blue()
@@ -98,7 +114,17 @@ fn check_exif_data(file: &std::path::Path) -> Result<()> {
       }
     }
     Err(e) => {
-      println!("{}", format!("❌ Error reading EXIF data: {e}").red());
+      if json_output {
+        let error_json = serde_json::json!({
+          "error": format!("Error reading EXIF data: {}", e)
+        });
+        match serde_json::to_string_pretty(&error_json) {
+          Ok(json_str) => println!("{json_str}"),
+          Err(e) => eprintln!("{}", format!("Error serializing error JSON: {e}").red()),
+        }
+      } else {
+        println!("{}", format!("❌ Error reading EXIF data: {e}").red());
+      }
     }
   }
 

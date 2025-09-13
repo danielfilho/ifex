@@ -164,6 +164,11 @@ impl ExifTags {
       String::new()
     };
 
+    let film_info = format!("{} {} (ISO {})", 
+      selection.film.maker, 
+      selection.film.name, 
+      selection.film.iso);
+
     format!(
       r#"<?xml version="1.0" encoding="UTF-8"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core">
@@ -175,6 +180,7 @@ impl ExifTags {
         xmlns:aux="http://ns.adobe.com/exif/1.0/aux/">
       <tiff:Make>{}</tiff:Make>
       <tiff:Model>{}</tiff:Model>
+      <tiff:ImageDescription>{}</tiff:ImageDescription>
 {}
       <exif:ISOSpeedRatings>
         <rdf:Bag>
@@ -191,6 +197,7 @@ impl ExifTags {
 </x:xmpmeta>"#,
       selection.camera.maker,
       selection.camera.model,
+      film_info,
       lens_metadata,
       selection.film.iso,
       selection.photographer.name
@@ -217,6 +224,11 @@ impl ExifTags {
       String::new()
     };
 
+    let film_info = format!("{} {} (ISO {})", 
+      selection.film.maker, 
+      selection.film.name, 
+      selection.film.iso);
+
     format!(
       r#"<?xml version="1.0" encoding="UTF-8"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core">
@@ -228,6 +240,7 @@ impl ExifTags {
         xmlns:aux="http://ns.adobe.com/exif/1.0/aux/">
       <tiff:Make>{}</tiff:Make>
       <tiff:Model>{}</tiff:Model>
+      <tiff:ImageDescription>{}</tiff:ImageDescription>
 {}
       <exif:ISOSpeedRatings>
         <rdf:Bag>
@@ -244,6 +257,7 @@ impl ExifTags {
 </x:xmpmeta>"#,
       selection.camera.maker,
       selection.camera.model,
+      film_info,
       lens_metadata,
       iso_value,
       selection.photographer.name

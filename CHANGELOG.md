@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.105.0] - 2025-09-11
+
+### ✨ New Features
+- **Added film information to EXIF metadata**: Film stock information (maker, name, and ISO) is now included in the dedicated Film EXIF field (0x0289)
+  - Film information is written to both JPEG EXIF segments and XMP sidecars for RAW files
+  - Uses proper Film tag instead of ImageDescription to avoid overwriting existing metadata
+  - Follows format: "Maker Name (ISO rating)" (e.g., "Fujifilm Santacolor 100 (ISO 100)")
+  - Displays as "Film [Tag(Tiff, 649)]" in output
+- **Added JSON output option for read command**: Use `--json` flag to output EXIF data in JSON format
+  - Enables programmatic access to EXIF metadata
+  - Maintains backward compatibility with table format as default
+- **Enhanced EXIF preservation**: Improved EXIF merging to preserve existing metadata while adding new film information
+  - Original IPTC data and other metadata are preserved during EXIF updates
+  - Only equipment-specific fields are updated with new data
+
+### 🧪 Testing
+- Added comprehensive test coverage for film information in EXIF data
+- Verified film metadata is properly embedded and retrievable
+
 ## [1.103.3] - 2025-08-24
 
 ### 🐛 Bug Fixes
