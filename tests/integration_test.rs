@@ -58,4 +58,3 @@ fn test_full_workflow_config_and_models() {
   assert_eq!(loaded_setup.camera_id, loaded_camera.id);
   assert_eq!(loaded_setup.lens_id, Some(loaded_lens.id));
 }
-

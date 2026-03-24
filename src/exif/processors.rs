@@ -790,10 +790,10 @@ impl JpegProcessor {
     add_ifd0_ascii(0x013B, &selection.photographer.name); // Artist
 
     // Add film information to Film field (0x0289)
-    let film_info = format!("{} {} (ISO {})", 
-      selection.film.maker, 
-      selection.film.name, 
-      selection.film.iso);
+    let film_info = format!(
+      "{} {} (ISO {})",
+      selection.film.maker, selection.film.name, selection.film.iso
+    );
     add_ifd0_ascii(0x0289, &film_info); // Film
 
     // Placeholder ExifIFDPointer (0x8769), LONG
@@ -978,7 +978,9 @@ impl JpegProcessor {
       Tag::Artist => Some(0x013b),
       Tag::Copyright => Some(0x8298),
       // Add Film tag mapping
-      _ if format!("{tag:?}").contains("Tag(") && format!("{tag:?}").contains("649)") => Some(0x0289), // Film
+      _ if format!("{tag:?}").contains("Tag(") && format!("{tag:?}").contains("649)") => {
+        Some(0x0289)
+      } // Film
       Tag::ExposureTime => Some(0x829a),
       Tag::FNumber => Some(0x829d),
       Tag::ExposureProgram => Some(0x8822),

@@ -164,10 +164,10 @@ impl ExifTags {
       String::new()
     };
 
-    let film_info = format!("{} {} (ISO {})", 
-      selection.film.maker, 
-      selection.film.name, 
-      selection.film.iso);
+    let film_info = format!(
+      "{} {} (ISO {})",
+      selection.film.maker, selection.film.name, selection.film.iso
+    );
 
     format!(
       r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -224,10 +224,10 @@ impl ExifTags {
       String::new()
     };
 
-    let film_info = format!("{} {} (ISO {})", 
-      selection.film.maker, 
-      selection.film.name, 
-      selection.film.iso);
+    let film_info = format!(
+      "{} {} (ISO {})",
+      selection.film.maker, selection.film.name, selection.film.iso
+    );
 
     format!(
       r#"<?xml version="1.0" encoding="UTF-8"?>
