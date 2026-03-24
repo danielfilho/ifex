@@ -291,7 +291,7 @@ impl Interface {
     }
 
     // Prompt for shot ISO (defaults to film's base ISO)
-    let shot_iso = self.prompt_shot_iso(selected_film.iso)?;
+    let shot_iso = Self::prompt_shot_iso(selected_film.iso)?;
     if shot_iso.is_none() {
       return Ok((None, None));
     }
@@ -328,7 +328,7 @@ impl Interface {
   ///
   /// Defaults to the film's base ISO rating. Useful for push/pull processing.
   /// Returns None if the user cancels the operation.
-  fn prompt_shot_iso(&self, default_iso: u32) -> Result<Option<u32>, Box<dyn std::error::Error>> {
+  fn prompt_shot_iso(default_iso: u32) -> Result<Option<u32>, Box<dyn std::error::Error>> {
     println!("{}", format!("📸 Film base ISO: {default_iso}").cyan());
 
     let prompt_text = format!("Enter the ISO speed you shot at (press Enter for {default_iso}): ");
@@ -341,11 +341,11 @@ impl Interface {
           Ok(Some(iso))
         } else {
           println!("{}", "❌ ISO must be between 1 and 6400".red());
-          self.prompt_shot_iso(default_iso)
+          Self::prompt_shot_iso(default_iso)
         }
       } else {
         println!("{}", "❌ Invalid ISO value. Please enter a number.".red());
-        self.prompt_shot_iso(default_iso)
+        Self::prompt_shot_iso(default_iso)
       }
     } else {
       Ok(None)
