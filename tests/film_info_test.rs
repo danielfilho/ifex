@@ -52,11 +52,6 @@ fn test_film_info_in_exif_segment() {
 
     // Read back the EXIF data to verify
     let exif_data = JpegProcessor::read_exif(&test_image_path).unwrap();
-    
-    println!("EXIF data after applying film information:");
-    for (tag, value) in &exif_data {
-        println!("  {tag}: {value}");
-    }
 
     // Check if film information is present
     let has_film_info = exif_data.iter().any(|(tag, value)| {

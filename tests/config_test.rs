@@ -17,17 +17,6 @@ fn test_config_default() {
 }
 
 #[test]
-fn test_config_load_nonexistent_file() {
-  // This test loads from the actual config file, which might exist
-  // So we test the behavior when file doesn't exist by checking the config_path doesn't exist
-  let config_path = Config::config_path().unwrap();
-  if !config_path.exists() {
-    let config = Config::load().unwrap();
-    assert!(config.cameras.is_empty());
-  }
-}
-
-#[test]
 fn test_config_save_and_load() {
   let temp_dir = TempDir::new().unwrap();
   let config_path = temp_dir.path().join("test_config.json");

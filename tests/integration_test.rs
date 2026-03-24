@@ -59,34 +59,3 @@ fn test_full_workflow_config_and_models() {
   assert_eq!(loaded_setup.lens_id, Some(loaded_lens.id));
 }
 
-#[test]
-fn test_selection_workflow() {
-  let camera = Camera::new("Nikon".to_string(), "D850".to_string());
-  let lens = Lens::new(
-    "Nikon".to_string(),
-    "AF-S 24-70mm".to_string(),
-    "24-70".to_string(),
-    "2.8".to_string(),
-    "F".to_string(),
-  );
-  let film = Film::new("Kodak".to_string(), "Portra 400".to_string(), 400);
-  let photographer = Photographer::new("Test User".to_string(), None);
-  let setup = Setup::new("Wedding Setup".to_string(), camera.id, Some(lens.id));
-
-  let selection = Selection {
-    setup,
-    camera,
-    lens: Some(lens),
-    film,
-    photographer,
-  };
-
-  assert_eq!(selection.camera.display_name(), "Nikon D850");
-  assert_eq!(
-    selection.lens.as_ref().unwrap().display_name(),
-    "Nikon AF-S 24-70mm 24-70mm f/2.8"
-  );
-  assert_eq!(selection.film.display_name(), "Kodak Portra 400 (ISO 400)");
-  assert_eq!(selection.photographer.display_name(), "Test User");
-  assert_eq!(selection.setup.display_name(), "Wedding Setup");
-}

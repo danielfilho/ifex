@@ -160,13 +160,15 @@ fn test_get_file_type_no_extension() {
 }
 
 #[test]
-fn test_get_file_type_unsupported() {
+fn test_get_file_type_unknown_extension_returns_raw() {
+  // Any extension not explicitly mapped (jpeg/tiff/dng) falls through to "raw",
+  // since get_file_type is only called on files already filtered by is_supported_image_format.
   assert_eq!(
-    get_file_type(Path::new("test.png")),
+    get_file_type(Path::new("test.cr2")),
     Some("raw".to_string())
   );
   assert_eq!(
-    get_file_type(Path::new("test.txt")),
+    get_file_type(Path::new("test.orf")),
     Some("raw".to_string())
   );
 }
