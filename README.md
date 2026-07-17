@@ -6,7 +6,7 @@
 
 A modern CLI tool for managing EXIF data in JPEG, TIFF, DNG, and RAW image files with structured equipment management. Built with Rust for performance and reliability.
 
-> **📢 Version 1.105.0**: Latest stable release with film information support and JSON output. Install via Homebrew or download from [releases](https://github.com/danielfilho/ifex/releases).
+> **📢 Version 1.105.2**: Latest stable release with film information support and JSON output. Install via Homebrew or download from [releases](https://github.com/danielfilho/ifex/releases).
 
 ## Features
 

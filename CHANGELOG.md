@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.105.2] - 2026-07-17
+
+### 🔨 Refactoring
+- **Major internal cleanup with no behavior changes**: consolidated duplicated logic across the codebase
+  - EXIF tag/XMP generation, batch processing loops, and EXIF field formatting now share single implementations
+  - Supported file extensions are defined in one place (`FileType`) and reused by all format checks
+  - Extracted shared processing-results display in the interactive interface
+- **Removed unused dependencies**: `tokio`, `anyhow`, `thiserror`, and `quick-xml` are no longer pulled in, significantly reducing build time and binary footprint
+- **Removed dead code and stray artifacts**: legacy manual test script, tracked test binary, and stale lint suppressions
+- **Deduplicated test runs**: each test now compiles and runs once (previously the whole suite ran twice via `tests/lib.rs`)
+
 ## [1.105.0] - 2025-09-11
 
 ### ✨ New Features
