@@ -189,8 +189,7 @@ impl ExifManager {
 
     match file_type {
       FileType::Jpeg => JpegProcessor::set_creation_date(file_path, &date_string),
-      FileType::Tiff => TiffProcessor::set_creation_date(file_path, &date_string),
-      FileType::Dng => TiffProcessor::set_creation_date(file_path, &date_string),
+      FileType::Tiff | FileType::Dng => TiffProcessor::set_creation_date(file_path, &date_string),
       FileType::Raw => RawProcessor::set_creation_date(file_path, &date_string),
     }
   }
@@ -227,21 +226,7 @@ impl ExifManager {
       return Ok(());
     }
 
-    let has_identical_dates = self.check_identical_dates(file_paths)?;
-
-    if has_identical_dates {
-      println!("All photos have the same creation date. Adjusting with 1-second increments...");
-      self.adjust_creation_dates(file_paths)?;
-      println!("✅ Creation dates adjusted successfully!");
-    } else {
-      // Ask user if they want to set identical dates for different timestamps
-      if self.prompt_set_identical_dates()? {
-        self.adjust_creation_dates(file_paths)?;
-        println!("✅ Creation dates set with 1-second increments!");
-      }
-    }
-
-    Ok(())
+    self.handle_date_adjustment(file_paths)
   }
 
   /// Processes all supported image files in a folder.
@@ -279,48 +264,13 @@ impl ExifManager {
       files: Vec::new(),
     };
 
-    let walker = WalkDir::new(folder_path);
-
-    for entry in walker {
+    for entry in WalkDir::new(folder_path) {
       match entry {
         Ok(entry) => {
           let path = entry.path();
 
           if path.is_file() && is_supported_image_format(path) {
-            let file_name = path
-              .file_name()
-              .unwrap_or_default()
-              .to_string_lossy()
-              .to_string();
-
-            let file_type = get_file_type(path);
-
-            let result = match operation {
-              "apply" => self.apply_exif_with_iso(path, selection.unwrap(), shot_iso),
-              "erase" => self.erase_exif(path),
-              _ => Err("Unknown operation".into()),
-            };
-
-            match result {
-              Ok(()) => {
-                stats.processed += 1;
-                stats.files.push(FileResult {
-                  name: file_name,
-                  success: true,
-                  file_type,
-                  error: None,
-                });
-              }
-              Err(e) => {
-                stats.failed += 1;
-                stats.files.push(FileResult {
-                  name: file_name,
-                  success: false,
-                  file_type,
-                  error: Some(e.to_string()),
-                });
-              }
-            }
+            self.process_file_into_stats(path, selection, operation, shot_iso, &mut stats);
           }
         }
         Err(e) => {
@@ -329,6 +279,56 @@ impl ExifManager {
       }
     }
 
+    Self::build_result(stats, "No supported image files found")
+  }
+
+  /// Processes a single file and records the outcome in the provided stats.
+  fn process_file_into_stats(
+    &self,
+    path: &Path,
+    selection: Option<&Selection>,
+    operation: &str,
+    shot_iso: Option<u32>,
+    stats: &mut ProcessingStats,
+  ) {
+    let file_name = path
+      .file_name()
+      .unwrap_or_default()
+      .to_string_lossy()
+      .to_string();
+
+    let file_type = get_file_type(path);
+
+    let result = match operation {
+      "apply" => self.apply_exif_with_iso(path, selection.unwrap(), shot_iso),
+      "erase" => self.erase_exif(path),
+      _ => Err("Unknown operation".into()),
+    };
+
+    match result {
+      Ok(()) => {
+        stats.processed += 1;
+        stats.files.push(FileResult {
+          name: file_name,
+          success: true,
+          file_type,
+          error: None,
+        });
+      }
+      Err(e) => {
+        stats.failed += 1;
+        stats.files.push(FileResult {
+          name: file_name,
+          success: false,
+          file_type,
+          error: Some(e.to_string()),
+        });
+      }
+    }
+  }
+
+  /// Builds the final `ProcessingResult` from accumulated stats.
+  fn build_result(stats: ProcessingStats, empty_message: &str) -> ProcessingResult {
     if stats.processed > 0 || stats.failed > 0 {
       ProcessingResult {
         success: true,
@@ -338,7 +338,7 @@ impl ExifManager {
     } else {
       ProcessingResult {
         success: false,
-        message: "No supported image files found".to_string(),
+        message: empty_message.to_string(),
         results: stats,
       }
     }
@@ -413,80 +413,11 @@ impl ExifManager {
 
     for file_path in file_paths {
       if file_path.is_file() && is_supported_image_format(file_path) {
-        let file_name = file_path
-          .file_name()
-          .unwrap_or_default()
-          .to_string_lossy()
-          .to_string();
-
-        let file_type = get_file_type(file_path);
-
-        let result = match operation {
-          "apply" => self.apply_exif_with_iso(file_path, selection.unwrap(), shot_iso),
-          "erase" => self.erase_exif(file_path),
-          _ => Err("Unknown operation".into()),
-        };
-
-        match result {
-          Ok(()) => {
-            stats.processed += 1;
-            stats.files.push(FileResult {
-              name: file_name,
-              success: true,
-              file_type,
-              error: None,
-            });
-          }
-          Err(e) => {
-            stats.failed += 1;
-            stats.files.push(FileResult {
-              name: file_name,
-              success: false,
-              file_type,
-              error: Some(e.to_string()),
-            });
-          }
-        }
+        self.process_file_into_stats(file_path, selection, operation, shot_iso, &mut stats);
       }
     }
 
-    if stats.processed > 0 || stats.failed > 0 {
-      ProcessingResult {
-        success: true,
-        message: "Processing completed".to_string(),
-        results: stats,
-      }
-    } else {
-      ProcessingResult {
-        success: false,
-        message: "No valid files to process".to_string(),
-        results: stats,
-      }
-    }
-  }
-
-  /// Applies EXIF metadata to a single image file.
-  ///
-  /// Determines the file type and delegates to the appropriate processor
-  /// to apply the EXIF metadata from the provided equipment selection.
-  #[allow(dead_code)]
-  fn apply_exif(
-    &self,
-    path: &Path,
-    selection: &Selection,
-  ) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::exif::file_types::FileType;
-    use crate::exif::processors::{JpegProcessor, RawProcessor, TiffProcessor};
-
-    let file_type = FileType::from_path(path)
-      .ok_or_else(|| format!("Unsupported file type: {}", path.display()))?;
-
-    match file_type {
-      FileType::Jpeg => JpegProcessor::apply_exif(path, selection),
-      FileType::Tiff => TiffProcessor::apply_exif(path, selection),
-      FileType::Dng => TiffProcessor::apply_exif(path, selection),
-      FileType::Raw => RawProcessor::apply_exif(path, selection),
-    }
+    Self::build_result(stats, "No valid files to process")
   }
 
   /// Applies EXIF metadata to a single image file with optional custom shot ISO.
@@ -499,16 +430,14 @@ impl ExifManager {
     selection: &Selection,
     shot_iso: Option<u32>,
   ) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::exif::file_types::FileType;
-    use crate::exif::processors::{JpegProcessor, RawProcessor, TiffProcessor};
-
     let file_type = FileType::from_path(path)
       .ok_or_else(|| format!("Unsupported file type: {}", path.display()))?;
 
     match file_type {
       FileType::Jpeg => JpegProcessor::apply_exif_with_iso(path, selection, shot_iso),
-      FileType::Tiff => TiffProcessor::apply_exif_with_iso(path, selection, shot_iso),
-      FileType::Dng => TiffProcessor::apply_exif_with_iso(path, selection, shot_iso),
+      FileType::Tiff | FileType::Dng => {
+        TiffProcessor::apply_exif_with_iso(path, selection, shot_iso)
+      }
       FileType::Raw => RawProcessor::apply_exif_with_iso(path, selection, shot_iso),
     }
   }
@@ -518,16 +447,12 @@ impl ExifManager {
   /// Determines the file type and delegates to the appropriate processor
   /// to remove all EXIF metadata from the file.
   fn erase_exif(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::exif::file_types::FileType;
-    use crate::exif::processors::{JpegProcessor, RawProcessor, TiffProcessor};
-
     let file_type = FileType::from_path(path)
       .ok_or_else(|| format!("Unsupported file type: {}", path.display()))?;
 
     match file_type {
       FileType::Jpeg => JpegProcessor::erase_exif(path),
-      FileType::Tiff => TiffProcessor::erase_exif(path),
-      FileType::Dng => TiffProcessor::erase_exif(path),
+      FileType::Tiff | FileType::Dng => TiffProcessor::erase_exif(path),
       FileType::Raw => RawProcessor::erase_exif(path),
     }
   }
@@ -539,16 +464,12 @@ impl ExifManager {
   ///
   /// Returns a vector of (`tag_name`, value) tuples sorted by tag name.
   pub fn read_exif_data(path: &Path) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
-    use crate::exif::file_types::FileType;
-    use crate::exif::processors::{JpegProcessor, RawProcessor, TiffProcessor};
-
     let file_type = FileType::from_path(path)
       .ok_or_else(|| format!("Unsupported file type: {}", path.display()))?;
 
     match file_type {
       FileType::Jpeg => JpegProcessor::read_exif(path),
-      FileType::Tiff => TiffProcessor::read_exif(path),
-      FileType::Dng => TiffProcessor::read_exif(path),
+      FileType::Tiff | FileType::Dng => TiffProcessor::read_exif(path),
       FileType::Raw => RawProcessor::read_exif(path),
     }
   }

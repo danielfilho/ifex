@@ -4,6 +4,7 @@
 //! determining supported image file formats, and extracting file type
 //! information from file extensions.
 
+use crate::exif::file_types::FileType;
 use std::path::Path;
 
 /// Cleans user-provided path input by removing quotes and handling escape sequences.
@@ -45,46 +46,7 @@ pub fn clean_path(input: &str) -> String {
 /// The check is case-insensitive.
 #[must_use]
 pub fn is_supported_image_format(path: &Path) -> bool {
-  if let Some(extension) = path.extension() {
-    if let Some(ext_str) = extension.to_str() {
-      let ext_lower = ext_str.to_lowercase();
-      matches!(
-        ext_lower.as_str(),
-        "jpg"
-          | "jpeg"
-          | "tif"
-          | "tiff"
-          | "dng"
-          | "cr2"
-          | "cr3"
-          | "nef"
-          | "nrw"
-          | "arw"
-          | "srf"
-          | "sr2"
-          | "orf"
-          | "rw2"
-          | "raf"
-          | "srw"
-          | "pef"
-          | "x3f"
-          | "erf"
-          | "mef"
-          | "mrw"
-          | "dcr"
-          | "kdc"
-          | "3fr"
-          | "fff"
-          | "iiq"
-          | "k25"
-          | "rwl"
-      )
-    } else {
-      false
-    }
-  } else {
-    false
-  }
+  FileType::from_path(path).is_some()
 }
 
 /// Determines the file type category from a file path's extension.
@@ -99,14 +61,12 @@ pub fn is_supported_image_format(path: &Path) -> bool {
 #[must_use]
 pub fn get_file_type(path: &Path) -> Option<String> {
   path.extension().and_then(|extension| {
-    extension.to_str().map(|ext_str| {
-      let ext_lower = ext_str.to_lowercase();
-      match ext_lower.as_str() {
-        "jpg" | "jpeg" => "jpeg".to_string(),
-        "tif" | "tiff" => "tiff".to_string(),
-        "dng" => "dng".to_string(),
-        _ => "raw".to_string(),
-      }
+    extension.to_str().map(|_| {
+      // Extensions not recognized by FileType still map to "raw", since callers
+      // filter through is_supported_image_format before asking for the type.
+      FileType::from_path(path)
+        .map_or("raw", |file_type| file_type.as_str())
+        .to_string()
     })
   })
 }

@@ -43,18 +43,8 @@ chrono = { version = "0.4", features = ["serde"] }
 kamadak-exif = "0.6"
 image = { version = "0.25", default-features = false, features = ["tiff"] }
 
-# Error handling
-anyhow = "1.0"
-thiserror = "1.0"
-
 # Cross-platform directories
 dirs = "5.0"
-
-# XML processing for XMP sidecars
-quick-xml = { version = "0.36", features = ["serialize"] }
-
-# Async runtime
-tokio = { version = "1.0", features = ["full"] }
 
 [dev-dependencies]
 tempfile = "3.8"

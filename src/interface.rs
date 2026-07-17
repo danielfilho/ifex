@@ -6,6 +6,7 @@
 
 use crate::{
   data::DataManager,
+  exif::exif_manager::ProcessingResult,
   models::{Camera, Film, Lens, Photographer, Selection, Setup},
   prompts::PromptUtils,
   utils::clean_path,
@@ -102,10 +103,10 @@ impl Interface {
     if folder_path.is_none() {
       return Ok(());
     }
-    let _folder_path = folder_path.unwrap();
+    let folder_path = folder_path.unwrap();
 
     // New file selection interface
-    let selected_files = PromptUtils::select_files_from_folder(&_folder_path)?;
+    let selected_files = PromptUtils::select_files_from_folder(&folder_path)?;
     if selected_files.is_none() {
       println!("{}", "No files selected. Returning to main menu.".yellow());
       return Ok(());
@@ -123,6 +124,12 @@ impl Interface {
       self.one_sec,
     );
 
+    Self::display_processing_result(&result);
+    Ok(())
+  }
+
+  /// Displays the outcome of a batch EXIF operation, including per-file results.
+  fn display_processing_result(result: &ProcessingResult) {
     if result.success {
       println!(
         "{}",
@@ -164,7 +171,6 @@ impl Interface {
     } else {
       println!("{}", format!("❌ Error: {}", result.message).red());
     }
-    Ok(())
   }
 
   /// Handles the EXIF erasure workflow.
@@ -176,7 +182,7 @@ impl Interface {
     if folder_path.is_none() {
       return Ok(());
     }
-    let _folder_path = folder_path.unwrap();
+    let folder_path = folder_path.unwrap();
 
     let confirmed = self.confirm_erase_exif()?;
     if confirmed != Some(true) {
@@ -187,49 +193,9 @@ impl Interface {
     println!("{}", "\n🗑️  Erasing EXIF data...\n".blue());
 
     let exif_manager = crate::ExifManager::new();
-    let result = exif_manager.process_folder(&_folder_path, None, "erase");
+    let result = exif_manager.process_folder(&folder_path, None, "erase");
 
-    if result.success {
-      println!(
-        "{}",
-        format!(
-          "✅ Successfully processed {} files",
-          result.results.processed
-        )
-        .green()
-      );
-      if result.results.failed > 0 {
-        println!(
-          "{}",
-          format!("❌ Failed to process {} files", result.results.failed).red()
-        );
-      }
-
-      println!("\n📊 Processing Results:");
-      for file in &result.results.files {
-        let status = if file.success {
-          "✓".green()
-        } else {
-          "✗".red()
-        };
-        let type_label = file
-          .file_type
-          .as_ref()
-          .map(|t| format!("[{}]", t.to_uppercase()))
-          .unwrap_or_default();
-        println!(
-          "  {} {} {}",
-          status,
-          file.name,
-          type_label.as_str().bright_black()
-        );
-        if let Some(error) = &file.error {
-          println!("    {}", format!("Error: {error}").red());
-        }
-      }
-    } else {
-      println!("{}", format!("❌ Error: {}", result.message).red());
-    }
+    Self::display_processing_result(&result);
     Ok(())
   }
 

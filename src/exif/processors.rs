@@ -29,6 +29,86 @@ pub struct TiffProcessor;
 /// and managing XMP sidecar files alongside the original raw files.
 pub struct RawProcessor;
 
+/// A single IFD entry used when serializing EXIF segments.
+struct ExifEntry {
+  tag: u16,
+  field_type: u16,
+  count: u32,
+  value_or_offset: u32,
+}
+
+/// Pushes an ASCII IFD entry, inlining values of up to 4 bytes and storing
+/// longer values (null-terminated) in the external data block.
+fn push_ascii_entry(entries: &mut Vec<ExifEntry>, external: &mut Vec<u8>, tag: u16, text: &str) {
+  let bytes = text.as_bytes();
+  let count = (bytes.len() + 1) as u32;
+  if count <= 4 {
+    let mut v = [0u8; 4];
+    v[..bytes.len()].copy_from_slice(bytes);
+    entries.push(ExifEntry {
+      tag,
+      field_type: 2,
+      count,
+      value_or_offset: u32::from_le_bytes(v),
+    });
+  } else {
+    let off = external.len() as u32;
+    external.extend_from_slice(bytes);
+    external.push(0);
+    entries.push(ExifEntry {
+      tag,
+      field_type: 2,
+      count,
+      value_or_offset: off,
+    });
+  }
+}
+
+/// Truncates a display value to 50 bytes at a valid UTF-8 boundary, appending an ellipsis.
+fn truncate_display_value(value: &mut String) {
+  if value.len() > 50 {
+    let mut truncate_at = 50;
+    while truncate_at > 0 && !value.is_char_boundary(truncate_at) {
+      truncate_at -= 1;
+    }
+    value.truncate(truncate_at);
+    value.push('…');
+  }
+}
+
+/// Formats all EXIF fields into (tag, value) pairs with IFD context and truncated values.
+fn format_exif_fields(exif: &exif::Exif) -> Vec<(String, String)> {
+  let mut results = Vec::new();
+
+  for field in exif.fields() {
+    let tag_name = JpegProcessor::format_tag_name(&field.tag);
+    let mut value = JpegProcessor::format_exif_value(&field.value);
+    truncate_display_value(&mut value);
+
+    // Add IFD context to help identify the source
+    let ifd_name = match field.ifd_num {
+      exif::In::PRIMARY => "",
+      exif::In::THUMBNAIL => " (Thumbnail)",
+      _ => " (Sub-IFD)",
+    };
+    let full_tag_name = if ifd_name.is_empty() {
+      tag_name.clone()
+    } else {
+      format!("{tag_name}{ifd_name}")
+    };
+
+    // Also add raw tag info for debugging unknown tags
+    let raw_tag_info = format!("{:?}", field.tag);
+    if raw_tag_info.contains("Tag(") && !raw_tag_info.starts_with(&tag_name) {
+      results.push((format!("{full_tag_name} [{raw_tag_info}]"), value));
+    } else {
+      results.push((full_tag_name, value));
+    }
+  }
+
+  results
+}
+
 impl JpegProcessor {
   /// Sets the creation date in a JPEG file's EXIF data.
   ///
@@ -114,7 +194,7 @@ impl JpegProcessor {
           }
         }
 
-        // Preserve other fields
+        // Preserve ASCII fields; other field types are not carried over
         if let Value::Ascii(ascii_vec) = &field.value {
           for ascii_bytes in ascii_vec {
             if let Ok(string_value) = std::str::from_utf8(ascii_bytes) {
@@ -126,8 +206,6 @@ impl JpegProcessor {
               }
             }
           }
-        } else {
-          // Preserve other field types using existing logic from the original implementation
         }
       }
     }
@@ -211,46 +289,7 @@ impl JpegProcessor {
   /// from the selection and embeds them into the JPEG file structure.
   /// This method preserves existing EXIF/IPTC data and only updates the specified fields.
   pub fn apply_exif(path: &Path, selection: &Selection) -> Result<(), Box<dyn std::error::Error>> {
-    let file = fs::File::open(path)?;
-    let mut bufreader = BufReader::new(&file);
-
-    let exifreader = Reader::new();
-    let existing_exif = exifreader.read_from_container(&mut bufreader).ok();
-
-    let original_data = fs::read(path)?;
-
-    let mut new_data = Vec::new();
-
-    if original_data.len() >= 2 && &original_data[0..2] == b"\xff\xd8" {
-      new_data.extend_from_slice(&original_data[0..2]);
-
-      // Create merged EXIF segment that preserves existing data
-      let exif_data = Self::create_merged_exif_segment(selection, existing_exif.as_ref())?;
-      new_data.extend_from_slice(&exif_data);
-
-      let mut i = 2;
-      while i < original_data.len() - 1 {
-        if original_data[i] == 0xff {
-          let marker = original_data[i + 1];
-          if marker == 0xe1 {
-            let segment_length =
-              (u16::from(original_data[i + 2]) << 8) | u16::from(original_data[i + 3]);
-            i += 2 + segment_length as usize;
-            continue;
-          }
-        }
-        new_data.push(original_data[i]);
-        i += 1;
-      }
-      if i < original_data.len() {
-        new_data.push(original_data[i]);
-      }
-    } else {
-      return Err("Not a valid JPEG file".into());
-    }
-
-    fs::write(path, new_data)?;
-    Ok(())
+    Self::apply_exif_with_iso(path, selection, None)
   }
 
   /// Erases EXIF metadata from a JPEG file.
@@ -297,44 +336,7 @@ impl JpegProcessor {
     let exifreader = Reader::new();
     let exif = exifreader.read_from_container(&mut bufreader)?;
 
-    let mut results = Vec::new();
-
-    // Read all EXIF fields from all IFDs
-    for field in exif.fields() {
-      let tag_name = Self::format_tag_name(&field.tag);
-      let mut value = Self::format_exif_value(&field.value);
-
-      // Truncate long values (UTF-8 safe)
-      if value.len() > 50 {
-        // Ensure we truncate at a valid UTF-8 boundary
-        let mut truncate_at = 50;
-        while truncate_at > 0 && !value.is_char_boundary(truncate_at) {
-          truncate_at -= 1;
-        }
-        value.truncate(truncate_at);
-        value.push('…');
-      }
-
-      // Add IFD context to help identify the source
-      let ifd_name = match field.ifd_num {
-        exif::In::PRIMARY => "",
-        exif::In::THUMBNAIL => " (Thumbnail)",
-        _ => " (Sub-IFD)",
-      };
-      let full_tag_name = if ifd_name.is_empty() {
-        tag_name.clone()
-      } else {
-        format!("{tag_name}{ifd_name}")
-      };
-
-      // Also add raw tag info for debugging unknown tags
-      let raw_tag_info = format!("{:?}", field.tag);
-      if raw_tag_info.contains("Tag(") && !raw_tag_info.starts_with(&tag_name) {
-        results.push((format!("{full_tag_name} [{raw_tag_info}]"), value.clone()));
-      } else {
-        results.push((full_tag_name, value));
-      }
-    }
+    let mut results = format_exif_fields(&exif);
 
     // Also try to read IPTC data from APP13 segments if present
     let mut iptc_results = Self::read_iptc_data(path)?;
@@ -397,16 +399,7 @@ impl JpegProcessor {
           if !value.is_empty() {
             let tag_name = Self::format_iptc_tag(record, dataset);
             let mut display_value = value;
-            // Truncate long values (UTF-8 safe)
-            if display_value.len() > 50 {
-              // Ensure we truncate at a valid UTF-8 boundary
-              let mut truncate_at = 50;
-              while truncate_at > 0 && !display_value.is_char_boundary(truncate_at) {
-                truncate_at -= 1;
-              }
-              display_value.truncate(truncate_at);
-              display_value.push('…');
-            }
+            truncate_display_value(&mut display_value);
             results.push((format!("IPTC: {tag_name}"), display_value));
           }
 
@@ -718,14 +711,6 @@ impl JpegProcessor {
     Ok(())
   }
 
-  /// Creates an EXIF segment while preserving existing EXIF data.
-  fn create_merged_exif_segment(
-    selection: &Selection,
-    existing_exif: Option<&exif::Exif>,
-  ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    Self::create_merged_exif_segment_with_iso(selection, None, existing_exif)
-  }
-
   /// Creates an EXIF segment with optional custom shot ISO while preserving existing EXIF data.
   /// This creates a properly formatted EXIF segment that Google Photos can read.
   fn create_merged_exif_segment_with_iso(
@@ -746,55 +731,36 @@ impl JpegProcessor {
     exif_data.extend_from_slice(&42u16.to_le_bytes()); // TIFF magic number
     exif_data.extend_from_slice(&8u32.to_le_bytes()); // Offset to first IFD (from TIFF header start)
 
-    // Define entry structure for EXIF entries
-    #[allow(clippy::items_after_statements)]
-    struct ExifEntry {
-      tag: u16,
-      field_type: u16,
-      count: u32,
-      value_or_offset: u32,
-    }
-
     // -------- IFD0 (primary) --------
     let mut ifd0_entries: Vec<ExifEntry> = Vec::new();
     let mut ifd0_external: Vec<u8> = Vec::new();
 
-    let mut add_ifd0_ascii = |tag: u16, text: &str| {
-      let bytes = text.as_bytes();
-      let count = (bytes.len() + 1) as u32;
-      if count <= 4 {
-        let mut v = [0u8; 4];
-        v[..bytes.len()].copy_from_slice(bytes);
-        ifd0_entries.push(ExifEntry {
-          tag,
-          field_type: 2,
-          count,
-          value_or_offset: u32::from_le_bytes(v),
-        });
-      } else {
-        let off = ifd0_external.len() as u32;
-        ifd0_external.extend_from_slice(bytes);
-        ifd0_external.push(0);
-        ifd0_entries.push(ExifEntry {
-          tag,
-          field_type: 2,
-          count,
-          value_or_offset: off,
-        });
-      }
-    };
-
     // Add equipment EXIF entries
-    add_ifd0_ascii(0x010F, &selection.camera.maker); // Make
-    add_ifd0_ascii(0x0110, &selection.camera.model); // Model
-    add_ifd0_ascii(0x013B, &selection.photographer.name); // Artist
+    push_ascii_entry(
+      &mut ifd0_entries,
+      &mut ifd0_external,
+      0x010F,
+      &selection.camera.maker,
+    ); // Make
+    push_ascii_entry(
+      &mut ifd0_entries,
+      &mut ifd0_external,
+      0x0110,
+      &selection.camera.model,
+    ); // Model
+    push_ascii_entry(
+      &mut ifd0_entries,
+      &mut ifd0_external,
+      0x013B,
+      &selection.photographer.name,
+    ); // Artist
 
     // Add film information to Film field (0x0289)
     let film_info = format!(
       "{} {} (ISO {})",
       selection.film.maker, selection.film.name, selection.film.iso
     );
-    add_ifd0_ascii(0x0289, &film_info); // Film
+    push_ascii_entry(&mut ifd0_entries, &mut ifd0_external, 0x0289, &film_info); // Film
 
     // Placeholder ExifIFDPointer (0x8769), LONG
     ifd0_entries.push(ExifEntry {
@@ -832,32 +798,6 @@ impl JpegProcessor {
     let mut exif_entries: Vec<ExifEntry> = Vec::new();
     let mut exif_external: Vec<u8> = Vec::new();
 
-    #[allow(clippy::items_after_statements)]
-    fn add_exif_ascii(entries: &mut Vec<ExifEntry>, external: &mut Vec<u8>, tag: u16, text: &str) {
-      let bytes = text.as_bytes();
-      let count = (bytes.len() + 1) as u32;
-      if count <= 4 {
-        let mut v = [0u8; 4];
-        v[..bytes.len()].copy_from_slice(bytes);
-        entries.push(ExifEntry {
-          tag,
-          field_type: 2,
-          count,
-          value_or_offset: u32::from_le_bytes(v),
-        });
-      } else {
-        let off = external.len() as u32;
-        external.extend_from_slice(bytes);
-        external.push(0);
-        entries.push(ExifEntry {
-          tag,
-          field_type: 2,
-          count,
-          value_or_offset: off,
-        });
-      }
-    }
-
     // ExifVersion (Undefined, 4 bytes) set to "0232"
     let ver = *b"0232";
     exif_entries.push(ExifEntry {
@@ -883,9 +823,9 @@ impl JpegProcessor {
 
     // Lens info & focal length
     if let Some(lens) = &selection.lens {
-      add_exif_ascii(&mut exif_entries, &mut exif_external, 0xA433, &lens.maker); // LensMake
+      push_ascii_entry(&mut exif_entries, &mut exif_external, 0xA433, &lens.maker); // LensMake
       let lens_model_string = lens.complete_lens_model();
-      add_exif_ascii(
+      push_ascii_entry(
         &mut exif_entries,
         &mut exif_external,
         0xA434,
@@ -1081,19 +1021,7 @@ impl TiffProcessor {
   pub fn apply_exif(path: &Path, _selection: &Selection) -> Result<(), Box<dyn std::error::Error>> {
     let img = image::open(path)?;
     let mut output_file = fs::File::create(path)?;
-
-    match img {
-      image::DynamicImage::ImageRgb8(rgb_img) => {
-        rgb_img.write_to(&mut output_file, image::ImageFormat::Tiff)?;
-      }
-      image::DynamicImage::ImageRgba8(rgba_img) => {
-        rgba_img.write_to(&mut output_file, image::ImageFormat::Tiff)?;
-      }
-      _ => {
-        img.write_to(&mut output_file, image::ImageFormat::Tiff)?;
-      }
-    }
-
+    img.write_to(&mut output_file, image::ImageFormat::Tiff)?;
     Ok(())
   }
 
@@ -1111,7 +1039,6 @@ impl TiffProcessor {
   ///
   /// Extracts all available EXIF fields and returns them as key-value pairs,
   /// sorted alphabetically by tag name.
-  /// Read EXIF data from a TIFF file and return as key-value pairs
   pub fn read_exif(path: &Path) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
     let file = fs::File::open(path)?;
     let mut bufreader = BufReader::new(&file);
@@ -1119,45 +1046,7 @@ impl TiffProcessor {
     let exifreader = Reader::new();
     let exif = exifreader.read_from_container(&mut bufreader)?;
 
-    let mut results = Vec::new();
-
-    // Read all EXIF fields from all IFDs
-    for field in exif.fields() {
-      let tag_name = JpegProcessor::format_tag_name(&field.tag);
-      let mut value = JpegProcessor::format_exif_value(&field.value);
-
-      // Truncate long values (UTF-8 safe)
-      if value.len() > 50 {
-        // Ensure we truncate at a valid UTF-8 boundary
-        let mut truncate_at = 50;
-        while truncate_at > 0 && !value.is_char_boundary(truncate_at) {
-          truncate_at -= 1;
-        }
-        value.truncate(truncate_at);
-        value.push('…');
-      }
-
-      // Add IFD context to help identify the source
-      let ifd_name = match field.ifd_num {
-        exif::In::PRIMARY => "",
-        exif::In::THUMBNAIL => " (Thumbnail)",
-        _ => " (Sub-IFD)",
-      };
-      let full_tag_name = if ifd_name.is_empty() {
-        tag_name.clone()
-      } else {
-        format!("{tag_name}{ifd_name}")
-      };
-
-      // Also add raw tag info for debugging unknown tags
-      let raw_tag_info = format!("{:?}", field.tag);
-      if raw_tag_info.contains("Tag(") && !raw_tag_info.starts_with(&tag_name) {
-        results.push((format!("{full_tag_name} [{raw_tag_info}]"), value.clone()));
-      } else {
-        results.push((full_tag_name, value));
-      }
-    }
-
+    let mut results = format_exif_fields(&exif);
     results.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(results)
   }

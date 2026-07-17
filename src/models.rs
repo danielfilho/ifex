@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Camera equipment model
-/// Camera equipment model
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Camera {
   /// Unique identifier for the camera

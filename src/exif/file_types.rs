@@ -28,23 +28,15 @@ impl FileType {
   /// Returns None for unsupported or missing file extensions.
   #[must_use]
   pub fn from_path(path: &Path) -> Option<Self> {
-    if let Some(extension) = path.extension() {
-      if let Some(ext_str) = extension.to_str() {
-        let ext_lower = ext_str.to_lowercase();
-        match ext_lower.as_str() {
-          "jpg" | "jpeg" => Some(Self::Jpeg),
-          "tif" | "tiff" => Some(Self::Tiff),
-          "dng" => Some(Self::Dng),
-          "cr2" | "cr3" | "nef" | "nrw" | "arw" | "srf" | "sr2" | "orf" | "rw2" | "raf" | "srw"
-          | "pef" | "x3f" | "erf" | "mef" | "mrw" | "dcr" | "kdc" | "3fr" | "fff" | "iiq"
-          | "k25" | "rwl" => Some(Self::Raw),
-          _ => None,
-        }
-      } else {
-        None
-      }
-    } else {
-      None
+    let ext_lower = path.extension()?.to_str()?.to_lowercase();
+    match ext_lower.as_str() {
+      "jpg" | "jpeg" => Some(Self::Jpeg),
+      "tif" | "tiff" => Some(Self::Tiff),
+      "dng" => Some(Self::Dng),
+      "cr2" | "cr3" | "nef" | "nrw" | "arw" | "srf" | "sr2" | "orf" | "rw2" | "raf" | "srw"
+      | "pef" | "x3f" | "erf" | "mef" | "mrw" | "dcr" | "kdc" | "3fr" | "fff" | "iiq" | "k25"
+      | "rwl" => Some(Self::Raw),
+      _ => None,
     }
   }
 

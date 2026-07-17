@@ -115,3 +115,6 @@ eslint.config.js
 # Claude configuration
 .claude/
 CLAUDE.local.md
+
+# Knowledge graph output
+graphify-out/

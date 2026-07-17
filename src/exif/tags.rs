@@ -21,27 +21,7 @@ impl ExifTags {
   /// Returns a `HashMap` where keys are EXIF tag names and values are the corresponding data.
   #[must_use]
   pub fn create_exif_object(selection: &Selection) -> HashMap<String, String> {
-    let mut exif_data = HashMap::new();
-
-    exif_data.insert("Make".to_string(), selection.camera.maker.clone());
-    exif_data.insert("Model".to_string(), selection.camera.model.clone());
-
-    // Only add lens data if a lens is present
-    if let Some(lens) = &selection.lens {
-      exif_data.insert("LensMake".to_string(), lens.maker.clone());
-      exif_data.insert("LensModel".to_string(), lens.lens_model_with_aperture());
-      exif_data.insert("FocalLength".to_string(), lens.focal_length.clone());
-      exif_data.insert("FNumber".to_string(), lens.aperture.clone());
-    }
-
-    exif_data.insert(
-      "ISOSpeedRatings".to_string(),
-      selection.film.iso.to_string(),
-    );
-    exif_data.insert("ISOSpeed".to_string(), selection.film.iso.to_string());
-    exif_data.insert("Artist".to_string(), selection.photographer.name.clone());
-
-    exif_data
+    Self::create_exif_object_with_iso(selection, None)
   }
 
   /// Creates a `HashMap` of EXIF tags from an equipment selection with custom shot ISO.
@@ -90,23 +70,7 @@ impl ExifTags {
   /// `FNumber`, `ISOSpeedRatings`, `ISOSpeed`, and Artist.
   #[must_use]
   pub fn get_tag_value(tag: &str, selection: &Selection) -> Option<String> {
-    match tag {
-      "Make" => Some(selection.camera.maker.clone()),
-      "Model" => Some(selection.camera.model.clone()),
-      "LensMake" => selection.lens.as_ref().map(|lens| lens.maker.clone()),
-      "LensModel" => selection
-        .lens
-        .as_ref()
-        .map(super::super::models::Lens::lens_model_with_aperture),
-      "FocalLength" => selection
-        .lens
-        .as_ref()
-        .map(|lens| lens.focal_length.clone()),
-      "FNumber" => selection.lens.as_ref().map(|lens| lens.aperture.clone()),
-      "ISOSpeedRatings" | "ISOSpeed" => Some(selection.film.iso.to_string()),
-      "Artist" => Some(selection.photographer.name.clone()),
-      _ => None,
-    }
+    Self::get_tag_value_with_iso(tag, selection, None)
   }
 
   /// Gets the value for a specific EXIF tag with optional custom shot ISO.
@@ -126,7 +90,7 @@ impl ExifTags {
       "LensModel" => selection
         .lens
         .as_ref()
-        .map(super::super::models::Lens::lens_model_with_aperture),
+        .map(crate::models::Lens::lens_model_with_aperture),
       "FocalLength" => selection
         .lens
         .as_ref()
@@ -151,57 +115,7 @@ impl ExifTags {
   /// namespaces for TIFF, EXIF, Dublin Core, and auxiliary data.
   #[must_use]
   pub fn create_xmp_metadata(selection: &Selection) -> String {
-    let lens_metadata = if let Some(lens) = &selection.lens {
-      format!(
-        r"      <aux:LensModel>{}</aux:LensModel>
-      <exif:FocalLength>{}</exif:FocalLength>
-      <exif:FNumber>{}</exif:FNumber>",
-        lens.lens_model_with_aperture(),
-        lens.focal_length,
-        lens.aperture
-      )
-    } else {
-      String::new()
-    };
-
-    let film_info = format!(
-      "{} {} (ISO {})",
-      selection.film.maker, selection.film.name, selection.film.iso
-    );
-
-    format!(
-      r#"<?xml version="1.0" encoding="UTF-8"?>
-<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core">
-  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-    <rdf:Description rdf:about=""
-        xmlns:tiff="http://ns.adobe.com/tiff/1.0/"
-        xmlns:exif="http://ns.adobe.com/exif/1.0/"
-        xmlns:dc="http://purl.org/dc/elements/1.1/"
-        xmlns:aux="http://ns.adobe.com/exif/1.0/aux/">
-      <tiff:Make>{}</tiff:Make>
-      <tiff:Model>{}</tiff:Model>
-      <tiff:ImageDescription>{}</tiff:ImageDescription>
-{}
-      <exif:ISOSpeedRatings>
-        <rdf:Bag>
-          <rdf:li>{}</rdf:li>
-        </rdf:Bag>
-      </exif:ISOSpeedRatings>
-      <dc:creator>
-        <rdf:Bag>
-          <rdf:li>{}</rdf:li>
-        </rdf:Bag>
-      </dc:creator>
-    </rdf:Description>
-  </rdf:RDF>
-</x:xmpmeta>"#,
-      selection.camera.maker,
-      selection.camera.model,
-      film_info,
-      lens_metadata,
-      selection.film.iso,
-      selection.photographer.name
-    )
+    Self::create_xmp_metadata_with_iso(selection, None)
   }
 
   /// Creates XMP metadata XML from an equipment selection with custom shot ISO.
