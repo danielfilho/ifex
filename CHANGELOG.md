@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.105.3] - 2026-10-25
+
+### 🔧 Maintenance
+- **Updated dependencies to latest**: clap 4.6, inquire 0.9, colored 3.1, dirs 7.0, uuid 1.29, plus dev-dependency bumps
+
 ## [1.105.2] - 2026-07-17
 
 ### 🔨 Refactoring
